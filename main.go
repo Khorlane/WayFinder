@@ -443,13 +443,6 @@ func (m *Mapper) solverContext() SolverContext {
 		NoRoomBetweenAxis: func(coordAfter func(RoomID) (int, int, bool), fromID, toID RoomID, fromR, fromC, toR, toC int) bool {
 			return m.noRoomBetweenAxis(coordAfter, fromID, toID, fromR, fromC, toR, toC)
 		},
-		RefreshLockedAdjacencies: m.refreshLockedAdjacencies,
-		SetOccupancy: func(occ map[[2]int]RoomID) {
-			m.occ = occ
-		},
-		SetCurrentRoom: func(id RoomID) {
-			m.cur = m.rooms[id]
-		},
 		Debugln: m.debugln,
 		Debugf:  m.debugf,
 	}
@@ -1410,7 +1403,27 @@ func (m *Mapper) makeRoom(from *Room, dir string, blocker RoomID) error {
 }
 
 func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) error {
-	return m.solver().RebuildDiscoveredLayout(cs, enterID, fromID, dirMoved)
+	result, err := m.solver().ComputeRebuildResult(cs, enterID, fromID, dirMoved)
+	if err != nil {
+		return err
+	}
+	for id, r := range m.rooms {
+		if r == nil {
+			continue
+		}
+		rs, ok := result.Rooms[id]
+		if !ok {
+			r.Placed = false
+			continue
+		}
+		r.Placed = rs.Placed
+		r.R = rs.R
+		r.C = rs.C
+	}
+	m.occ = result.Occ
+	m.refreshLockedAdjacencies()
+	m.cur = m.rooms[result.Current]
+	return nil
 }
 
 // Enter applies one "arrival" event: ENTER id FROM dirMoved.

@@ -1,0 +1,124 @@
+WAYFINDER CODEX TASK 005
+Rebuild Result Extraction (Separate Computation from Application)
+
+Objective
+---------
+Take the next architectural step after solver context extraction.
+
+Validation and rebuild logic are now in the solver and operate through
+explicit context. However, rebuild still both:
+
+1. computes a rebuilt layout
+2. applies that layout directly back into mapper-owned state
+
+This task separates those concerns.
+
+Important
+---------
+Do NOT change observable behavior.
+Do NOT redesign the algorithm in this pass.
+Do NOT change spatial semantics.
+Do NOT change discovery semantics.
+Do NOT rewrite incremental movement logic beyond what is necessary to support
+the extracted rebuild result flow.
+
+Why
+---
+Current state is improved, but rebuild is still mixing:
+
+- layout computation
+- state mutation / application
+
+We want the next clearer boundary:
+
+- solver computes a rebuild result
+- mapper applies the rebuild result
+
+This keeps Mapper as the owner of mutable state while making solver output
+explicit.
+
+Scope
+-----
+Refactor rebuild so the solver produces an explicit result object describing
+the rebuilt projection, and Mapper applies that result.
+
+Required Changes
+----------------
+
+1. Introduce an explicit rebuild result type.
+
+   Example possibilities:
+
+   - RebuildResult
+   - LayoutProjection
+   - ProjectionResult
+
+   Exact naming is up to you.
+
+   At minimum, it should explicitly represent:
+
+   - room coordinates / placement results
+   - occupancy result
+   - current room result if needed
+   - any other data the mapper must apply after a rebuild
+
+2. Change solver rebuild to compute and return this result.
+
+   The solver should no longer primarily mutate mapper-owned state while
+   computing the rebuild.
+
+   It should produce a concrete explicit result.
+
+3. Move rebuild application into Mapper.
+
+   Mapper should remain the owner of authoritative mutable state.
+
+   After solver returns the rebuild result, Mapper should apply it through
+   a clear application step.
+
+4. Preserve behavior.
+
+   Existing tests and runtime behavior must remain unchanged.
+
+Non-Goals
+---------
+Do NOT:
+
+- redesign rebuild algorithm
+- redesign validation semantics
+- redesign ConstraintSet schema
+- redesign solver context model
+- split into packages
+- perform broad unrelated cleanup
+- intentionally change public behavior
+
+Success Criteria
+----------------
+This pass is successful if:
+
+1. The code compiles cleanly.
+2. Existing tests still pass.
+3. Runtime behavior remains unchanged.
+4. Rebuild computation returns an explicit result object.
+5. Mapper applies rebuild results explicitly.
+6. Solver is cleaner because rebuild computation is separated from state
+   application.
+
+Implementation Guidance
+-----------------------
+This is a structure-only refactor.
+
+Good end state examples:
+
+- solver computes RebuildResult
+- Mapper receives RebuildResult
+- Mapper applies coordinates/occupancy/current-room updates
+- lock refresh still happens in the correct place
+- behavior remains the same
+
+Be conservative.
+Do not try to purify the entire codebase in one pass.
+
+Deliverable
+-----------
+Make the code changes, ensure there are no errors, and preserve behavior.

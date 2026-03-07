@@ -6,14 +6,23 @@ import (
 )
 
 type SolverContext struct {
-	Rooms                    map[RoomID]*Room
-	EnsureRoom               func(RoomID) *Room
-	NoRoomBetweenAxis        func(func(RoomID) (int, int, bool), RoomID, RoomID, int, int, int, int) bool
-	RefreshLockedAdjacencies func()
-	SetOccupancy             func(map[[2]int]RoomID)
-	SetCurrentRoom           func(RoomID)
-	Debugln                  func(...any)
-	Debugf                   func(string, ...any)
+	Rooms             map[RoomID]*Room
+	EnsureRoom        func(RoomID) *Room
+	NoRoomBetweenAxis func(func(RoomID) (int, int, bool), RoomID, RoomID, int, int, int, int) bool
+	Debugln           func(...any)
+	Debugf            func(string, ...any)
+}
+
+type RebuildRoomState struct {
+	Placed bool
+	R      int
+	C      int
+}
+
+type RebuildResult struct {
+	Rooms   map[RoomID]RebuildRoomState
+	Occ     map[[2]int]RoomID
+	Current RoomID
 }
 
 type ConstraintSolver struct {
@@ -56,12 +65,12 @@ func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter fu
 	return nil
 }
 
-func (s *ConstraintSolver) RebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) error {
+func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) (RebuildResult, error) {
 	s.ctx.EnsureRoom(enterID)
 	s.ctx.EnsureRoom(fromID)
 	drMove, dcMove, ok := dirDelta(dirMoved)
 	if !ok {
-		return fmt.Errorf("mapping error: rebuild got unsupported direction %q", dirMoved)
+		return RebuildResult{}, fmt.Errorf("mapping error: rebuild got unsupported direction %q", dirMoved)
 	}
 
 	discovered := make(map[RoomID]struct{}, len(cs.Discovered)+2)
@@ -288,34 +297,36 @@ func (s *ConstraintSolver) RebuildDiscoveredLayout(cs ConstraintSet, enterID, fr
 		s.ctx.Debugln("mode=full_rebuild")
 		coords, newOcc, err = layoutApprox(false)
 		if err != nil {
-			return err
+			return RebuildResult{}, err
 		}
 	}
 
+	fromRC, okFrom := coords[fromID]
+	enterRC, okEnter := coords[enterID]
+	if !okFrom || !okEnter {
+		return RebuildResult{}, fmt.Errorf("mapping error: repack failed to place from/enter rooms")
+	}
+	if enterRC[0] != fromRC[0]+drMove || enterRC[1] != fromRC[1]+dcMove {
+		return RebuildResult{}, fmt.Errorf("mapping error: repack did not satisfy immediate move %s -%s-> %s", fromID, dirMoved, enterID)
+	}
+
+	roomStates := make(map[RoomID]RebuildRoomState, len(s.ctx.Rooms))
 	for id, r := range s.ctx.Rooms {
 		if r == nil {
 			continue
 		}
 		if rc, ok := coords[id]; ok {
-			r.Placed = true
-			r.R, r.C = rc[0], rc[1]
+			roomStates[id] = RebuildRoomState{Placed: true, R: rc[0], C: rc[1]}
 		} else {
-			r.Placed = false
+			roomStates[id] = RebuildRoomState{Placed: false}
 		}
 	}
-	s.ctx.SetOccupancy(newOcc)
-	s.ctx.RefreshLockedAdjacencies()
 
-	from := s.ctx.Rooms[fromID]
-	enter := s.ctx.Rooms[enterID]
-	if from == nil || !from.Placed || enter == nil || !enter.Placed {
-		return fmt.Errorf("mapping error: repack failed to place from/enter rooms")
-	}
-	if enter.R != from.R+drMove || enter.C != from.C+dcMove {
-		return fmt.Errorf("mapping error: repack did not satisfy immediate move %s -%s-> %s", fromID, dirMoved, enterID)
-	}
-	s.ctx.SetCurrentRoom(enterID)
 	s.ctx.Debugln("REPACK APPLIED")
 	s.ctx.Debugf("from=%s enter=%s dir=%s\n", fromID, enterID, dirMoved)
-	return nil
+	return RebuildResult{
+		Rooms:   roomStates,
+		Occ:     newOcc,
+		Current: enterID,
+	}, nil
 }
