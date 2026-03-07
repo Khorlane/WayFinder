@@ -437,9 +437,19 @@ func (m *Mapper) validateConstraintSet(cs ConstraintSet, coordAfter func(RoomID)
 }
 
 func (m *Mapper) solverContext() SolverContext {
+	rooms := make(map[RoomID]SolverRoomState, len(m.rooms))
+	for id, r := range m.rooms {
+		if r == nil {
+			continue
+		}
+		rooms[id] = SolverRoomState{
+			Placed: r.Placed,
+			R:      r.R,
+			C:      r.C,
+		}
+	}
 	return SolverContext{
-		Rooms:      m.rooms,
-		EnsureRoom: m.getRoom,
+		Rooms: rooms,
 		NoRoomBetweenAxis: func(coordAfter func(RoomID) (int, int, bool), fromID, toID RoomID, fromR, fromC, toR, toC int) bool {
 			return m.noRoomBetweenAxis(coordAfter, fromID, toID, fromR, fromC, toR, toC)
 		},

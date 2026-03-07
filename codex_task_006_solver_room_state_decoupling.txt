@@ -1,0 +1,103 @@
+
+WAYFINDER CODEX TASK 006
+Solver Room State Decoupling
+
+Objective
+---------
+Remove solver dependency on Mapper's Room struct.
+
+Currently SolverContext exposes:
+
+    Rooms map[RoomID]*Room
+
+This couples the solver to Mapper internals.
+
+The solver should operate on simple room state data instead.
+
+We will introduce a solver-facing structure describing room state.
+
+Important
+---------
+Do NOT change algorithm behavior.
+Do NOT redesign rebuild logic.
+Do NOT change discovery semantics.
+Do NOT change constraint logic.
+
+This is strictly a structural decoupling.
+
+Required Changes
+----------------
+
+1. Introduce a solver-facing room state structure.
+
+Example:
+
+    type SolverRoomState struct {
+        Placed bool
+        R int
+        C int
+    }
+
+2. Replace the SolverContext Rooms field.
+
+Current:
+
+    Rooms map[RoomID]*Room
+
+New:
+
+    Rooms map[RoomID]SolverRoomState
+
+3. Remove direct mutation of Mapper Room objects from solver code.
+
+The solver must treat room state as read-only input.
+
+4. Ensure EnsureRoom behavior still works.
+
+You may:
+
+- replace EnsureRoom
+- or provide a solver-side helper that initializes missing rooms
+
+The solver must NOT depend on Mapper allocation behavior.
+
+5. Update ComputeRebuildResult to build results from solver state.
+
+It must not rely on pointer identity or mutation.
+
+6. Mapper remains responsible for applying results.
+
+Mapper still owns:
+
+    Room objects
+    occupancy map
+    current room pointer
+
+Solver produces results only.
+
+Success Criteria
+----------------
+
+The change is complete if:
+
+1. Solver does not reference *Room anywhere.
+2. Solver compiles cleanly.
+3. All existing behavior remains identical.
+4. RebuildResult still contains the same output semantics.
+5. Mapper still applies results exactly as before.
+
+Non-Goals
+---------
+
+Do NOT:
+
+- move files
+- split packages
+- rewrite algorithms
+- refactor unrelated code
+- change public behavior
+
+Deliverable
+-----------
+
+Modify the code to decouple the solver from the Room struct while preserving behavior.

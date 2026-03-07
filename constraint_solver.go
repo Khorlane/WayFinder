@@ -6,11 +6,16 @@ import (
 )
 
 type SolverContext struct {
-	Rooms             map[RoomID]*Room
-	EnsureRoom        func(RoomID) *Room
+	Rooms             map[RoomID]SolverRoomState
 	NoRoomBetweenAxis func(func(RoomID) (int, int, bool), RoomID, RoomID, int, int, int, int) bool
 	Debugln           func(...any)
 	Debugf            func(string, ...any)
+}
+
+type SolverRoomState struct {
+	Placed bool
+	R      int
+	C      int
 }
 
 type RebuildRoomState struct {
@@ -66,8 +71,17 @@ func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter fu
 }
 
 func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) (RebuildResult, error) {
-	s.ctx.EnsureRoom(enterID)
-	s.ctx.EnsureRoom(fromID)
+	rooms := make(map[RoomID]SolverRoomState, len(s.ctx.Rooms)+2)
+	for id, rs := range s.ctx.Rooms {
+		rooms[id] = rs
+	}
+	if _, ok := rooms[enterID]; !ok {
+		rooms[enterID] = SolverRoomState{}
+	}
+	if _, ok := rooms[fromID]; !ok {
+		rooms[fromID] = SolverRoomState{}
+	}
+
 	drMove, dcMove, ok := dirDelta(dirMoved)
 	if !ok {
 		return RebuildResult{}, fmt.Errorf("mapping error: rebuild got unsupported direction %q", dirMoved)
@@ -78,8 +92,8 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		discovered[id] = struct{}{}
 	}
 	if len(discovered) == 0 {
-		for id, r := range s.ctx.Rooms {
-			if r != nil && r.Placed {
+		for id, r := range rooms {
+			if r.Placed {
 				discovered[id] = struct{}{}
 			}
 		}
@@ -123,8 +137,8 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 	}
 
 	oldPos := make(map[RoomID][2]int)
-	for id, r := range s.ctx.Rooms {
-		if r == nil || !r.Placed {
+	for id, r := range rooms {
+		if !r.Placed {
 			continue
 		}
 		if _, ok := discovered[id]; !ok {
@@ -310,11 +324,8 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		return RebuildResult{}, fmt.Errorf("mapping error: repack did not satisfy immediate move %s -%s-> %s", fromID, dirMoved, enterID)
 	}
 
-	roomStates := make(map[RoomID]RebuildRoomState, len(s.ctx.Rooms))
-	for id, r := range s.ctx.Rooms {
-		if r == nil {
-			continue
-		}
+	roomStates := make(map[RoomID]RebuildRoomState, len(rooms))
+	for id := range rooms {
 		if rc, ok := coords[id]; ok {
 			roomStates[id] = RebuildRoomState{Placed: true, R: rc[0], C: rc[1]}
 		} else {
