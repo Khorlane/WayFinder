@@ -1,0 +1,17 @@
+# Go build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Logs
+*.log
+log.txt
+
+# IDE
+.vscode/
+*workspace
+
+# Room data
+Rooms/
