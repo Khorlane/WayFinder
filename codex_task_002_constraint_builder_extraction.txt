@@ -1,0 +1,132 @@
+WAYFINDER CODEX TASK 002
+Constraint Builder Extraction (Behavior-Preserving, Focus on Rebuild Inputs)
+
+Objective
+---------
+Take the next safe step in the ConstraintSet refactor.
+
+The current seam is in place:
+- ConstraintSet exists
+- validation routes through ConstraintSet
+- rebuild accepts ConstraintSet explicitly
+
+However, ConstraintSet is still mostly a thin wrapper around m.locks, and
+rebuild still largely derives its own effective relationships from topology
+plus current state.
+
+This task is to make constraint generation more explicit and more central,
+without changing observable behavior.
+
+Important
+---------
+Do NOT redesign the solver.
+Do NOT change runtime behavior intentionally.
+Do NOT rewrite enterIncremental in this pass.
+Do NOT remove the existing locks mechanism yet unless it is truly dead code
+after the refactor.
+
+Why
+---
+Right now the code still has this shape:
+
+- refreshLockedAdjacencies discovers/accumulates locked relationships
+- BuildConstraintSet mostly re-expresses m.locks
+- rebuildDiscoveredLayout accepts ConstraintSet but mainly uses discovered-room
+  membership and still derives most of its own adjacency implications
+
+We want the next architectural step:
+
+Constraint generation should become a clearer, explicit phase.
+
+Scope
+-----
+This pass should focus on making ConstraintSet a more meaningful product of
+current discovered topology + locked relationships, and on making rebuild
+consume that explicit product more directly.
+
+Required Changes
+----------------
+
+1. Strengthen ConstraintSet as a real model.
+
+   Expand or refine ConstraintSet / ConstraintRelation so it more clearly
+   represents the currently enforced layout constraints.
+
+   It is acceptable if the schema is still transitional.
+   It does NOT need to be the final design.
+
+   At minimum, the model should clearly distinguish:
+
+   - discovered room membership
+   - directional ordered relationship constraints
+   - axis-aligned lane / no-between constraints
+   - locked identity for monotonic relationships
+
+2. Introduce a clearer builder path.
+
+   BuildConstraintSet should no longer feel like "just wrap m.locks".
+
+   The builder should explicitly gather the current constraint picture from:
+   - discovered/placed rooms
+   - topology
+   - locked relationships already established
+
+   Preserve current semantics.
+   This is still not a full redesign.
+
+3. Make rebuildDiscoveredLayout consume ConstraintSet more directly.
+
+   In this pass, rebuild should use ConstraintSet as its main explicit source
+   of what must be preserved, instead of mostly re-deriving everything in an
+   implicit scattered way.
+
+   Important:
+   - do NOT replace the rebuild algorithm wholesale
+   - do NOT attempt a full solver redesign
+   - do make the code show that rebuild is operating from an explicit
+     constraint product
+
+4. Preserve current behavior.
+
+   Existing tests and current runtime behavior should still pass.
+   This task is structural / architectural, not a semantics change.
+
+Non-Goals
+---------
+Do NOT:
+
+- change ordered-alignment semantics
+- change no-between semantics
+- change discovery semantics
+- implement a brand new solver
+- fully remove lock refresh/validation unless it becomes obviously redundant
+- split into packages/files unless absolutely necessary
+
+Success Criteria
+----------------
+This pass is successful if:
+
+1. The code compiles cleanly.
+2. Existing tests still pass.
+3. Runtime behavior remains unchanged.
+4. ConstraintSet is more meaningful than a thin wrapper over m.locks.
+5. rebuildDiscoveredLayout now visibly depends on ConstraintSet as an explicit
+   source of preserved relationships.
+
+Implementation Guidance
+-----------------------
+Think of this as moving from:
+
+implicit state + scattered derivation
+
+toward:
+
+explicit constraint product + solver/rebuild consuming it
+
+Stay incremental.
+
+Do not try to finish the whole architecture in one pass.
+
+Deliverable
+-----------
+Make the code changes, ensure there are no errors, and preserve behavior.
