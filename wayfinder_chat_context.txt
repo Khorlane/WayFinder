@@ -1,0 +1,254 @@
+
+WAYFINDER PROJECT CONTEXT
+Paste this into a new ChatGPT session to continue the conversation with full context.
+
+------------------------------------------------
+PROJECT: WayFinder
+Language: Go
+Repository: WayFinder (local project, public GitHub repo)
+
+Purpose:
+WayFinder is a MUD navigation client and automapper. It connects to a MUD via telnet,
+discovers rooms incrementally, and builds a spatial grid map based on directional exits.
+
+The map is NOT preloaded from the world files when used with a real MUD.
+Rooms are discovered dynamically as the player moves.
+
+------------------------------------------------
+HIGH LEVEL ARCHITECTURE
+
+WayFinder
+│
+├── WayFinder Client Shell (WCS)
+│      - Telnet client
+│      - UI framework (Fyne)
+│      - command input
+│      - MUD output display
+│      - event routing
+│
+├── WayFinder Navigation Engine (WNE)
+│      - navigation session
+│      - discovery tracking
+│      - topology events
+│
+├── WayFinder Mapping Runtime (WMR)
+│      - incremental room placement
+│      - spatial constraints
+│      - rebuild logic
+│      - layout projection
+│
+└── WayFinder Render Pipeline (WRP)
+       - renders map grid
+       - currently CLI grid renderer
+       - future Fyne map panel
+
+------------------------------------------------
+CURRENT IMPLEMENTATION STATUS
+
+Core Mapping Engine:
+DONE
+
+Features implemented:
+- incremental map construction
+- discovery model (rooms only appear when discovered)
+- ordered alignment constraints
+- lane reservation (no rooms inserted between locked pairs)
+- correction engine
+- makeRoom algorithm
+- multi-step planner fallback
+- rebuild fallback
+- topology constraints preserved
+
+Solver Architecture:
+DONE
+
+Structure:
+
+Mapper
+   ↓
+SolverEngine interface
+   ↓
+ConstraintSolver implementation
+
+Solver extracted to its own package:
+
+solver/
+    solver.go
+
+Solver API:
+- ValidateConstraintSet()
+- ComputeRebuildResult()
+
+Mapper converts internal structures into solver structures.
+
+------------------------------------------------
+CURRENT PROJECT STRUCTURE
+
+Project root:
+
+WayFinder/
+│
+├── main.go
+├── navigation_session.go
+├── navigation_session_test.go
+│
+├── solver/
+│      solver.go
+│
+├── docs/
+│      architecture.md
+│      mapper_rules.md
+│      discovery_model.md
+│      dev/llm_context.txt
+│
+├── go.mod
+├── README.md
+├── LICENSE
+└── .gitignore
+
+------------------------------------------------
+KEY DESIGN RULES
+
+Discovery Model:
+- rooms are discovered as entered
+- exits revealed immediately when room discovered
+- no hidden exits exist in this world
+
+Spatial Constraints:
+- N/S relationships require same column
+- E/W relationships require same row
+- ordering must be preserved
+- gaps allowed between rooms
+- no room allowed between locked adjacency pairs
+
+Example:
+D3B above ECE
+
+Valid:
+
+D3B
+ECE
+
+D3B
+.
+ECE
+
+But not:
+
+D3B
+NEWROOM
+ECE
+
+------------------------------------------------
+MAP LAYOUT MODEL
+
+Coordinates are an infinite integer grid.
+
+Rooms contain:
+
+RoomID
+Placed flag
+Row
+Column
+
+Occupancy map tracks which room occupies each cell.
+
+Locks represent discovered adjacencies that must remain valid.
+
+------------------------------------------------
+REBUILD SYSTEM
+
+When incremental placement cannot resolve conflicts,
+the solver performs a rebuild of the discovered map.
+
+Rebuild process:
+1. build constraint set
+2. run solver
+3. produce new room layout
+4. mapper applies results
+
+------------------------------------------------
+SOLVER PACKAGE
+
+solver/
+    solver.go
+
+Major types:
+
+SolverContext
+SolverRoomState
+ConstraintSet
+ConstraintRelation
+LockedAdjKey
+RebuildResult
+RebuildRoomState
+
+SolverEngine interface:
+
+ValidateConstraintSet()
+ComputeRebuildResult()
+
+Current implementation:
+
+ConstraintSolver
+
+------------------------------------------------
+FUTURE WORK
+
+1. Telnet integration
+library:
+github.com/reiver/go-telnet
+
+2. GUI client
+framework:
+github.com/fyne-io/fyne
+
+UI layout target:
+
++----------------------+---------------+
+| MUD output window    | Map panel     |
+|                      |               |
+|                      |               |
++----------------------+---------------+
+| Command input field                  |
++--------------------------------------+
+
+3. Renderer
+Replace CLI grid renderer with Fyne canvas renderer.
+
+------------------------------------------------
+NAMING CONVENTIONS
+
+WayFinder Client Shell (WCS)
+WayFinder Navigation Engine (WNE)
+WayFinder Mapping Runtime (WMR)
+WayFinder Render Pipeline (WRP)
+
+------------------------------------------------
+CURRENT DEVELOPMENT WORKFLOW
+
+1. ChatGPT designs architecture steps
+2. Instructions given to Codex (VSCode extension)
+3. Codex edits files and ensures build success
+4. Updated files reviewed
+5. Next task generated
+
+------------------------------------------------
+CURRENT STATUS SUMMARY
+
+Mapping engine: complete
+Solver architecture: complete
+Package separation: mostly complete
+Telnet integration: not started
+GUI: not started
+
+Estimated completion: ~70-75%
+
+Remaining work is mostly integration and UI.
+
+------------------------------------------------
+
+design only discussion. So, with the bare minimum of changes and
+leveraging github.com/reiver/go-telnet, can we modify so that we 
+can either use the current world navigation (proven to work) or
+switch to connecting to the mud at www.holyquest.org:7373
