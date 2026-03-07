@@ -31,12 +31,13 @@ type Room struct {
 }
 
 type Mapper struct {
-	rooms map[RoomID]*Room
-	occ   map[[2]int]RoomID
-	cur   *Room
-	topo  Topology
-	locks map[lockedAdjKey]struct{} // Monotonic set of discovered adjacencies that must remain satisfied.
-	debug io.Writer
+	rooms          map[RoomID]*Room
+	occ            map[[2]int]RoomID
+	cur            *Room
+	topo           Topology
+	locks          map[lockedAdjKey]struct{} // Monotonic set of discovered adjacencies that must remain satisfied.
+	debug          io.Writer
+	solverProvider SolverProvider
 }
 
 type lockedAdjKey struct {
@@ -204,10 +205,11 @@ func setupLogging(logPath string) (func(), error) {
 
 func NewMapper() *Mapper {
 	m := &Mapper{
-		rooms: make(map[RoomID]*Room),
-		occ:   make(map[[2]int]RoomID),
-		locks: make(map[lockedAdjKey]struct{}),
-		debug: io.Discard,
+		rooms:          make(map[RoomID]*Room),
+		occ:            make(map[[2]int]RoomID),
+		locks:          make(map[lockedAdjKey]struct{}),
+		debug:          io.Discard,
+		solverProvider: DefaultSolverProvider,
 	}
 	return m
 }
@@ -222,6 +224,14 @@ func (m *Mapper) SetDebugWriter(w io.Writer) {
 		return
 	}
 	m.debug = w
+}
+
+func (m *Mapper) SetSolverProvider(p SolverProvider) {
+	if p == nil {
+		m.solverProvider = DefaultSolverProvider
+		return
+	}
+	m.solverProvider = p
 }
 
 func (m *Mapper) debugln(a ...any) {
@@ -458,7 +468,13 @@ func (m *Mapper) solverContext() SolverContext {
 	}
 }
 
-func (m *Mapper) solver() *ConstraintSolver { return NewConstraintSolver(m.solverContext()) }
+func (m *Mapper) solver() SolverEngine {
+	provider := m.solverProvider
+	if provider == nil {
+		provider = DefaultSolverProvider
+	}
+	return provider(m.solverContext())
+}
 
 func (m *Mapper) shiftWhere(pred func(*Room) bool, dr, dc int) error {
 	if dr == 0 && dc == 0 {

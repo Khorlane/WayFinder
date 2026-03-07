@@ -12,6 +12,13 @@ type SolverContext struct {
 	Debugf            func(string, ...any)
 }
 
+type SolverEngine interface {
+	ValidateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error
+	ComputeRebuildResult(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) (RebuildResult, error)
+}
+
+type SolverProvider func(SolverContext) SolverEngine
+
 type SolverRoomState struct {
 	Placed bool
 	R      int
@@ -37,6 +44,12 @@ type ConstraintSolver struct {
 func NewConstraintSolver(ctx SolverContext) *ConstraintSolver {
 	return &ConstraintSolver{ctx: ctx}
 }
+
+var DefaultSolverProvider SolverProvider = func(ctx SolverContext) SolverEngine {
+	return NewConstraintSolver(ctx)
+}
+
+var _ SolverEngine = (*ConstraintSolver)(nil)
 
 func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error {
 	for _, rel := range cs.Relations {
