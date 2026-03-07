@@ -35,7 +35,7 @@ type Mapper struct {
 	occ   map[[2]int]RoomID
 	cur   *Room
 	topo  Topology
-	locks map[lockedAdjKey]struct{}      // Monotonic set of discovered adjacencies that must remain satisfied.
+	locks map[lockedAdjKey]struct{} // Monotonic set of discovered adjacencies that must remain satisfied.
 	debug io.Writer
 }
 
@@ -43,6 +43,61 @@ type lockedAdjKey struct {
 	From RoomID
 	To   RoomID
 	Dir  string
+}
+
+type ConstraintRelation struct {
+	Key           lockedAdjKey
+	AxisAligned   bool
+	SameRow       bool
+	SameColumn    bool
+	RequiresOrder bool
+	NoRoomBetween bool
+}
+
+type ConstraintSet struct {
+	Discovered map[RoomID]struct{}
+	Relations  []ConstraintRelation
+}
+
+func (m *Mapper) BuildConstraintSet() ConstraintSet {
+	cs := ConstraintSet{
+		Discovered: make(map[RoomID]struct{}),
+		Relations:  make([]ConstraintRelation, 0, len(m.locks)),
+	}
+	for id, r := range m.rooms {
+		if r != nil && r.Placed {
+			cs.Discovered[id] = struct{}{}
+		}
+	}
+	for k := range m.locks {
+		rel := ConstraintRelation{
+			Key:           k,
+			RequiresOrder: true,
+		}
+		switch k.Dir {
+		case "E", "W":
+			rel.AxisAligned = true
+			rel.SameRow = true
+			rel.NoRoomBetween = true
+		case "N", "S":
+			rel.AxisAligned = true
+			rel.SameColumn = true
+			rel.NoRoomBetween = true
+		}
+		cs.Relations = append(cs.Relations, rel)
+	}
+	sort.Slice(cs.Relations, func(i, j int) bool {
+		li := cs.Relations[i].Key
+		lj := cs.Relations[j].Key
+		if li.From != lj.From {
+			return li.From < lj.From
+		}
+		if li.Dir != lj.Dir {
+			return li.Dir < lj.Dir
+		}
+		return li.To < lj.To
+	})
+	return cs
 }
 
 type lockedAdjViolationError struct {
@@ -336,13 +391,26 @@ func (m *Mapper) refreshLockedAdjacencies() {
 }
 
 func (m *Mapper) validateLockedAdjacencies(coordAfter func(RoomID) (int, int, bool)) error {
-	for k := range m.locks {
+	return m.validateConstraintSet(m.BuildConstraintSet(), coordAfter)
+}
+
+func (m *Mapper) validateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error {
+	for _, rel := range cs.Relations {
+		k := rel.Key
 		fromR, fromC, okFrom := coordAfter(k.From)
 		toR, toC, okTo := coordAfter(k.To)
 		if !okFrom || !okTo {
 			return fmt.Errorf("mapping invariant: locked adjacency references unplaced room: %s -%s-> %s", k.From, k.Dir, k.To)
 		}
-		if !edgeAlignedAndOrdered(fromR, fromC, toR, toC, k.Dir) ||
+		if rel.RequiresOrder && !edgeAlignedAndOrdered(fromR, fromC, toR, toC, k.Dir) {
+			expDr, expDc, _ := dirDelta(k.Dir)
+			return &lockedAdjViolationError{
+				Key:       k,
+				ExpectedR: expDr,
+				ExpectedC: expDc,
+			}
+		}
+		if rel.NoRoomBetween &&
 			!m.noRoomBetweenAxis(coordAfter, k.From, k.To, fromR, fromC, toR, toC) {
 			expDr, expDc, _ := dirDelta(k.Dir)
 			return &lockedAdjViolationError{
@@ -403,7 +471,7 @@ func (m *Mapper) shiftWhere(pred func(*Room) bool, dr, dc int) error {
 	}
 
 	// Any candidate shift must preserve every locked discovered adjacency.
-	if err := m.validateLockedAdjacencies(coordAfter); err != nil {
+	if err := m.validateConstraintSet(m.BuildConstraintSet(), coordAfter); err != nil {
 		return err
 	}
 
@@ -1307,7 +1375,7 @@ func (m *Mapper) makeRoom(from *Room, dir string, blocker RoomID) error {
 		blocker, tried+2, strings.Join(failures, " | "))
 }
 
-func (m *Mapper) rebuildDiscoveredLayout(enterID, fromID RoomID, dirMoved string) error {
+func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) error {
 	if m.topo == nil {
 		return fmt.Errorf("mapping error: topology not bound")
 	}
@@ -1318,10 +1386,15 @@ func (m *Mapper) rebuildDiscoveredLayout(enterID, fromID RoomID, dirMoved string
 		return fmt.Errorf("mapping error: rebuild got unsupported direction %q", dirMoved)
 	}
 
-	discovered := make(map[RoomID]struct{})
-	for id, r := range m.rooms {
-		if r != nil && r.Placed {
-			discovered[id] = struct{}{}
+	discovered := make(map[RoomID]struct{}, len(cs.Discovered)+2)
+	for id := range cs.Discovered {
+		discovered[id] = struct{}{}
+	}
+	if len(discovered) == 0 {
+		for id, r := range m.rooms {
+			if r != nil && r.Placed {
+				discovered[id] = struct{}{}
+			}
 		}
 	}
 	discovered[enterID] = struct{}{}
@@ -1581,7 +1654,8 @@ func (m *Mapper) Enter(id RoomID, dirMoved string) error {
 		if m.cur == nil || !m.cur.Placed {
 			return err
 		}
-		if rbErr := m.rebuildDiscoveredLayout(id, m.cur.ID, dirMoved); rbErr != nil {
+		cs := m.BuildConstraintSet()
+		if rbErr := m.rebuildDiscoveredLayout(cs, id, m.cur.ID, dirMoved); rbErr != nil {
 			return fmt.Errorf("%v; rebuild failed: %v", err, rbErr)
 		}
 		return nil

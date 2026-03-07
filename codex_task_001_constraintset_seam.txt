@@ -1,0 +1,125 @@
+WAYFINDER CODEX TASK 001
+ConstraintSet Design Seam (No Behavior Change)
+
+Objective
+---------
+Create the first architectural seam for separating constraint generation
+from layout solving.
+
+This task is intentionally conservative.
+Do NOT change observable behavior.
+Do NOT redesign the algorithm in this pass.
+Do NOT remove existing logic.
+This pass is about introducing structure only.
+
+Why
+---
+The current Mapper still mixes:
+- constraint discovery / lock acquisition
+- constraint validation
+- layout mutation / correction / rebuild
+
+We want to begin moving toward:
+
+1. constraint generation
+2. layout solving / projection
+3. coordination
+
+The safest first step is to introduce a first-class ConstraintSet concept
+without changing behavior.
+
+Scope
+-----
+Work only on establishing the ConstraintSet seam and wiring rebuild /
+validation code toward it in a minimal way.
+
+Required Changes
+----------------
+
+1. Introduce a first-class ConstraintSet concept.
+
+   Add types that represent the current constraint vocabulary already used
+   by the mapper.
+
+   The initial ConstraintSet should be able to represent, at minimum:
+
+   - discovered room membership
+   - ordered directional relationship between two rooms
+   - same-row / same-column implications as needed by current rules
+   - no-room-between requirement for locked axis-aligned pairs
+   - locked directional pair identity (from, dir, to)
+
+   Important:
+   This first pass does NOT need a perfect or final schema.
+   It only needs to be explicit, understandable, and useful.
+
+2. Add a builder method on Mapper that produces the current ConstraintSet.
+
+   Example intent:
+   - gather the currently discovered / placed relationships
+   - gather the currently locked directional pairs
+   - produce one explicit object describing what must be true
+
+   The builder may internally reuse current logic and data structures.
+   That is acceptable in this pass.
+
+3. Refactor validation to consume ConstraintSet as input.
+
+   Current behavior from lock validation must remain unchanged.
+
+   In other words:
+   - keep the same validation semantics
+   - but route validation through ConstraintSet where practical
+
+4. Refactor rebuild path to accept / consume ConstraintSet as an explicit input.
+
+   Important:
+   Do NOT redesign rebuild.
+   Do NOT replace the solver.
+   Just add the seam so rebuild is no longer conceptually operating on
+   implicit scattered state only.
+
+5. Preserve all existing behavior.
+
+   Current program output, movement behavior, rebuild behavior, and tests
+   should continue to work exactly as before.
+
+Non-Goals
+---------
+Do NOT:
+
+- change spatial semantics
+- change discovery semantics
+- change ordered-alignment rules
+- change no-between rules
+- rewrite enterIncremental
+- replace current move/candidate/block logic
+- redesign the whole mapper
+- split files/packages unless absolutely necessary
+- remove existing locks mechanism yet
+
+Success Criteria
+----------------
+This pass is successful if:
+
+1. The code compiles cleanly.
+2. Existing tests still pass.
+3. Runtime behavior is unchanged.
+4. Mapper now has an explicit ConstraintSet concept.
+5. Validation and rebuild code now acknowledge that concept explicitly.
+
+Implementation Guidance
+-----------------------
+Use the current code as the source of truth.
+
+Relevant current areas include:
+- refreshLockedAdjacencies
+- validateLockedAdjacencies
+- rebuildDiscoveredLayout
+- enterIncremental (for context only)
+
+You are creating a seam, not finishing the refactor.
+
+Deliverable
+-----------
+Make the code changes, ensure there are no errors, and preserve behavior.
