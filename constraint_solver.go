@@ -5,12 +5,23 @@ import (
 	"sort"
 )
 
-type ConstraintSolver struct {
-	m *Mapper
+type SolverContext struct {
+	Rooms                    map[RoomID]*Room
+	EnsureRoom               func(RoomID) *Room
+	NoRoomBetweenAxis        func(func(RoomID) (int, int, bool), RoomID, RoomID, int, int, int, int) bool
+	RefreshLockedAdjacencies func()
+	SetOccupancy             func(map[[2]int]RoomID)
+	SetCurrentRoom           func(RoomID)
+	Debugln                  func(...any)
+	Debugf                   func(string, ...any)
 }
 
-func NewConstraintSolver(m *Mapper) *ConstraintSolver {
-	return &ConstraintSolver{m: m}
+type ConstraintSolver struct {
+	ctx SolverContext
+}
+
+func NewConstraintSolver(ctx SolverContext) *ConstraintSolver {
+	return &ConstraintSolver{ctx: ctx}
 }
 
 func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error {
@@ -33,7 +44,7 @@ func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter fu
 			}
 		}
 		if rel.NoRoomBetween &&
-			!s.m.noRoomBetweenAxis(coordAfter, k.From, k.To, fromR, fromC, toR, toC) {
+			!s.ctx.NoRoomBetweenAxis(coordAfter, k.From, k.To, fromR, fromC, toR, toC) {
 			expDr, expDc, _ := dirDelta(k.Dir)
 			return &lockedAdjViolationError{
 				Key:       k,
@@ -46,9 +57,8 @@ func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter fu
 }
 
 func (s *ConstraintSolver) RebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) error {
-	m := s.m
-	m.getRoom(enterID)
-	m.getRoom(fromID)
+	s.ctx.EnsureRoom(enterID)
+	s.ctx.EnsureRoom(fromID)
 	drMove, dcMove, ok := dirDelta(dirMoved)
 	if !ok {
 		return fmt.Errorf("mapping error: rebuild got unsupported direction %q", dirMoved)
@@ -59,7 +69,7 @@ func (s *ConstraintSolver) RebuildDiscoveredLayout(cs ConstraintSet, enterID, fr
 		discovered[id] = struct{}{}
 	}
 	if len(discovered) == 0 {
-		for id, r := range m.rooms {
+		for id, r := range s.ctx.Rooms {
 			if r != nil && r.Placed {
 				discovered[id] = struct{}{}
 			}
@@ -104,7 +114,7 @@ func (s *ConstraintSolver) RebuildDiscoveredLayout(cs ConstraintSet, enterID, fr
 	}
 
 	oldPos := make(map[RoomID][2]int)
-	for id, r := range m.rooms {
+	for id, r := range s.ctx.Rooms {
 		if r == nil || !r.Placed {
 			continue
 		}
@@ -269,20 +279,20 @@ func (s *ConstraintSolver) RebuildDiscoveredLayout(cs ConstraintSet, enterID, fr
 		return coords, occ, nil
 	}
 
-	m.debugln("REPACK START")
-	m.debugln("mode=local")
+	s.ctx.Debugln("REPACK START")
+	s.ctx.Debugln("mode=local")
 	coords, newOcc, err := layoutApprox(true)
 	if err != nil {
-		m.debugln("REPACK FALLBACK")
-		m.debugf("reason=%v\n", err)
-		m.debugln("mode=full_rebuild")
+		s.ctx.Debugln("REPACK FALLBACK")
+		s.ctx.Debugf("reason=%v\n", err)
+		s.ctx.Debugln("mode=full_rebuild")
 		coords, newOcc, err = layoutApprox(false)
 		if err != nil {
 			return err
 		}
 	}
 
-	for id, r := range m.rooms {
+	for id, r := range s.ctx.Rooms {
 		if r == nil {
 			continue
 		}
@@ -293,19 +303,19 @@ func (s *ConstraintSolver) RebuildDiscoveredLayout(cs ConstraintSet, enterID, fr
 			r.Placed = false
 		}
 	}
-	m.occ = newOcc
-	m.refreshLockedAdjacencies()
+	s.ctx.SetOccupancy(newOcc)
+	s.ctx.RefreshLockedAdjacencies()
 
-	from := m.rooms[fromID]
-	enter := m.rooms[enterID]
+	from := s.ctx.Rooms[fromID]
+	enter := s.ctx.Rooms[enterID]
 	if from == nil || !from.Placed || enter == nil || !enter.Placed {
 		return fmt.Errorf("mapping error: repack failed to place from/enter rooms")
 	}
 	if enter.R != from.R+drMove || enter.C != from.C+dcMove {
 		return fmt.Errorf("mapping error: repack did not satisfy immediate move %s -%s-> %s", fromID, dirMoved, enterID)
 	}
-	m.cur = m.rooms[enterID]
-	m.debugln("REPACK APPLIED")
-	m.debugf("from=%s enter=%s dir=%s\n", fromID, enterID, dirMoved)
+	s.ctx.SetCurrentRoom(enterID)
+	s.ctx.Debugln("REPACK APPLIED")
+	s.ctx.Debugf("from=%s enter=%s dir=%s\n", fromID, enterID, dirMoved)
 	return nil
 }

@@ -1,0 +1,132 @@
+WAYFINDER CODEX TASK 004
+Solver Context Extraction (Reduce Direct Mapper Dependence, Preserve Behavior)
+
+Objective
+---------
+Take the next safe architectural step after solver extraction.
+
+Task 003 successfully moved validation and rebuild logic into
+constraint_solver.go, but the solver still depends directly on *Mapper.
+
+This task introduces a more explicit solver context/input model so the solver
+stops reaching broadly into mapper internals.
+
+Important
+---------
+Do NOT change observable behavior.
+Do NOT redesign the algorithm in this pass.
+Do NOT change spatial semantics.
+Do NOT change discovery semantics.
+Do NOT rewrite enterIncremental or major movement logic except as needed to
+pass explicit solver inputs.
+
+Why
+---
+Current state:
+
+- ConstraintSet is explicit
+- ConstraintSolver exists
+- but ConstraintSolver still depends on `m *Mapper`
+
+That means solver code still has broad access to mapper internals.
+
+We want the next architectural step:
+
+- Mapper remains coordinator/state owner
+- Solver operates on explicit inputs / context
+- Solver dependencies become clear and bounded
+
+Scope
+-----
+Create an explicit solver context/input structure and refactor the solver to use
+it instead of directly depending on the whole Mapper wherever practical.
+
+Required Changes
+----------------
+
+1. Introduce an explicit solver context or input model.
+
+   This can be one or more types such as:
+
+   - SolverContext
+   - SolverState
+   - RebuildContext
+   - ValidationContext
+
+   Exact naming is up to you.
+
+   The goal is that solver code no longer primarily reaches through
+   `s.m.<something>` for everything.
+
+2. Pass required state explicitly into solver operations.
+
+   The solver should receive the specific information it needs, such as:
+
+   - rooms
+   - occupancy
+   - topology access
+   - locks / constraint set
+   - debug sink if needed
+   - helper callbacks where appropriate
+
+   Do this incrementally and conservatively.
+
+3. Reduce broad mapper coupling.
+
+   Refactor `constraint_solver.go` so it depends less directly on the whole
+   Mapper object.
+
+   It is acceptable if some narrow dependency remains in this pass.
+   The goal is meaningful reduction, not perfect purity.
+
+4. Keep Mapper as the owner of mutable state.
+
+   Do NOT invert ownership.
+   Mapper still owns the authoritative mutable layout state.
+
+   The solver should operate on explicit inputs and return results / apply
+   changes through narrow interfaces, not by assuming broad Mapper access.
+
+5. Preserve behavior.
+
+   Existing tests and runtime behavior must remain unchanged.
+
+Non-Goals
+---------
+Do NOT:
+
+- redesign the solver algorithm
+- redesign rebuild semantics
+- redesign validation semantics
+- redesign ConstraintSet schema
+- split into packages
+- perform broad unrelated cleanup
+- change public behavior intentionally
+
+Success Criteria
+----------------
+This pass is successful if:
+
+1. The code compiles cleanly.
+2. Existing tests still pass.
+3. Runtime behavior remains unchanged.
+4. ConstraintSolver no longer primarily depends on broad `*Mapper` access.
+5. Solver inputs/dependencies are more explicit and bounded.
+6. The architecture is clearer: Mapper coordinates, solver consumes context.
+
+Implementation Guidance
+-----------------------
+This is a staged decoupling pass.
+
+Good examples of progress:
+
+- create a context struct holding the specific fields the solver needs
+- pass callbacks/helpers where full Mapper access is not necessary
+- reduce direct `s.m.rooms`, `s.m.occ`, `s.m.topo`, `s.m.debug...` style access
+- preserve existing wrappers on Mapper if helpful
+
+Do not try to finish the entire decoupling in one pass.
+
+Deliverable
+-----------
+Make the code changes, ensure there are no errors, and preserve behavior.

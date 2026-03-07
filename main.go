@@ -436,7 +436,26 @@ func (m *Mapper) validateConstraintSet(cs ConstraintSet, coordAfter func(RoomID)
 	return m.solver().ValidateConstraintSet(cs, coordAfter)
 }
 
-func (m *Mapper) solver() *ConstraintSolver { return NewConstraintSolver(m) }
+func (m *Mapper) solverContext() SolverContext {
+	return SolverContext{
+		Rooms:      m.rooms,
+		EnsureRoom: m.getRoom,
+		NoRoomBetweenAxis: func(coordAfter func(RoomID) (int, int, bool), fromID, toID RoomID, fromR, fromC, toR, toC int) bool {
+			return m.noRoomBetweenAxis(coordAfter, fromID, toID, fromR, fromC, toR, toC)
+		},
+		RefreshLockedAdjacencies: m.refreshLockedAdjacencies,
+		SetOccupancy: func(occ map[[2]int]RoomID) {
+			m.occ = occ
+		},
+		SetCurrentRoom: func(id RoomID) {
+			m.cur = m.rooms[id]
+		},
+		Debugln: m.debugln,
+		Debugf:  m.debugf,
+	}
+}
+
+func (m *Mapper) solver() *ConstraintSolver { return NewConstraintSolver(m.solverContext()) }
 
 func (m *Mapper) shiftWhere(pred func(*Room) bool, dr, dc int) error {
 	if dr == 0 && dc == 0 {
