@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"WayFinder/solver"
 )
 
 type RoomID string
@@ -37,7 +39,7 @@ type Mapper struct {
 	topo           Topology
 	locks          map[lockedAdjKey]struct{} // Monotonic set of discovered adjacencies that must remain satisfied.
 	debug          io.Writer
-	solverProvider SolverProvider
+	solverProvider solver.SolverProvider
 }
 
 type lockedAdjKey struct {
@@ -209,7 +211,7 @@ func NewMapper() *Mapper {
 		occ:            make(map[[2]int]RoomID),
 		locks:          make(map[lockedAdjKey]struct{}),
 		debug:          io.Discard,
-		solverProvider: DefaultSolverProvider,
+		solverProvider: solver.DefaultSolverProvider,
 	}
 	return m
 }
@@ -226,9 +228,9 @@ func (m *Mapper) SetDebugWriter(w io.Writer) {
 	m.debug = w
 }
 
-func (m *Mapper) SetSolverProvider(p SolverProvider) {
+func (m *Mapper) SetSolverProvider(p solver.SolverProvider) {
 	if p == nil {
-		m.solverProvider = DefaultSolverProvider
+		m.solverProvider = solver.DefaultSolverProvider
 		return
 	}
 	m.solverProvider = p
@@ -443,37 +445,86 @@ func (m *Mapper) validateLockedAdjacencies(coordAfter func(RoomID) (int, int, bo
 }
 
 func (m *Mapper) validateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error {
-	return m.solver().ValidateConstraintSet(cs, coordAfter)
+	solverCoord := func(id solver.RoomID) (int, int, bool) {
+		return coordAfter(RoomID(id))
+	}
+	err := m.solver().ValidateConstraintSet(m.toSolverConstraintSet(cs), solverCoord)
+	var sLockErr *solver.LockedAdjViolationError
+	if errors.As(err, &sLockErr) {
+		return &lockedAdjViolationError{
+			Key: lockedAdjKey{
+				From: RoomID(sLockErr.Key.From),
+				To:   RoomID(sLockErr.Key.To),
+				Dir:  sLockErr.Key.Dir,
+			},
+			ExpectedR: sLockErr.ExpectedR,
+			ExpectedC: sLockErr.ExpectedC,
+		}
+	}
+	return err
 }
 
-func (m *Mapper) solverContext() SolverContext {
-	rooms := make(map[RoomID]SolverRoomState, len(m.rooms))
+func (m *Mapper) solverContext() solver.SolverContext {
+	rooms := make(map[solver.RoomID]solver.SolverRoomState, len(m.rooms))
 	for id, r := range m.rooms {
 		if r == nil {
 			continue
 		}
-		rooms[id] = SolverRoomState{
+		rooms[solver.RoomID(id)] = solver.SolverRoomState{
 			Placed: r.Placed,
 			R:      r.R,
 			C:      r.C,
 		}
 	}
-	return SolverContext{
+	return solver.SolverContext{
 		Rooms: rooms,
-		NoRoomBetweenAxis: func(coordAfter func(RoomID) (int, int, bool), fromID, toID RoomID, fromR, fromC, toR, toC int) bool {
-			return m.noRoomBetweenAxis(coordAfter, fromID, toID, fromR, fromC, toR, toC)
+		NoRoomBetweenAxis: func(coordAfter func(solver.RoomID) (int, int, bool), fromID, toID solver.RoomID, fromR, fromC, toR, toC int) bool {
+			mainCoord := func(id RoomID) (int, int, bool) {
+				return coordAfter(solver.RoomID(id))
+			}
+			return m.noRoomBetweenAxis(mainCoord, RoomID(fromID), RoomID(toID), fromR, fromC, toR, toC)
 		},
-		Debugln: m.debugln,
-		Debugf:  m.debugf,
+		EdgeAlignedAndOrdered: edgeAlignedAndOrdered,
+		DirDelta:              dirDelta,
+		ColName:               colName,
+		Debugln:               m.debugln,
+		Debugf:                m.debugf,
 	}
 }
 
-func (m *Mapper) solver() SolverEngine {
+func (m *Mapper) solver() solver.SolverEngine {
 	provider := m.solverProvider
 	if provider == nil {
-		provider = DefaultSolverProvider
+		provider = solver.DefaultSolverProvider
 	}
 	return provider(m.solverContext())
+}
+
+func (m *Mapper) toSolverConstraintSet(cs ConstraintSet) solver.ConstraintSet {
+	out := solver.ConstraintSet{
+		Discovered: make(map[solver.RoomID]struct{}, len(cs.Discovered)),
+		Relations:  make([]solver.ConstraintRelation, 0, len(cs.Relations)),
+	}
+	for id := range cs.Discovered {
+		out.Discovered[solver.RoomID(id)] = struct{}{}
+	}
+	for _, rel := range cs.Relations {
+		out.Relations = append(out.Relations, solver.ConstraintRelation{
+			Key: solver.LockedAdjKey{
+				From: solver.RoomID(rel.Key.From),
+				To:   solver.RoomID(rel.Key.To),
+				Dir:  rel.Key.Dir,
+			},
+			Locked:        rel.Locked,
+			Enforced:      rel.Enforced,
+			AxisAligned:   rel.AxisAligned,
+			SameRow:       rel.SameRow,
+			SameColumn:    rel.SameColumn,
+			RequiresOrder: rel.RequiresOrder,
+			NoRoomBetween: rel.NoRoomBetween,
+		})
+	}
+	return out
 }
 
 func (m *Mapper) shiftWhere(pred func(*Room) bool, dr, dc int) error {
@@ -1429,7 +1480,12 @@ func (m *Mapper) makeRoom(from *Room, dir string, blocker RoomID) error {
 }
 
 func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) error {
-	result, err := m.solver().ComputeRebuildResult(cs, enterID, fromID, dirMoved)
+	result, err := m.solver().ComputeRebuildResult(
+		m.toSolverConstraintSet(cs),
+		solver.RoomID(enterID),
+		solver.RoomID(fromID),
+		dirMoved,
+	)
 	if err != nil {
 		return err
 	}
@@ -1437,7 +1493,7 @@ func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomI
 		if r == nil {
 			continue
 		}
-		rs, ok := result.Rooms[id]
+		rs, ok := result.Rooms[solver.RoomID(id)]
 		if !ok {
 			r.Placed = false
 			continue
@@ -1446,9 +1502,12 @@ func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomI
 		r.R = rs.R
 		r.C = rs.C
 	}
-	m.occ = result.Occ
+	m.occ = make(map[[2]int]RoomID, len(result.Occ))
+	for k, v := range result.Occ {
+		m.occ[k] = RoomID(v)
+	}
 	m.refreshLockedAdjacencies()
-	m.cur = m.rooms[result.Current]
+	m.cur = m.rooms[RoomID(result.Current)]
 	return nil
 }
 

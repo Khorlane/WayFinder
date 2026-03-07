@@ -1,23 +1,43 @@
-package main
+package solver
 
 import (
 	"fmt"
 	"sort"
 )
 
+type RoomID string
+
+type LockedAdjKey struct {
+	From RoomID
+	To   RoomID
+	Dir  string
+}
+
+type ConstraintRelation struct {
+	Key           LockedAdjKey
+	Locked        bool
+	Enforced      bool
+	AxisAligned   bool
+	SameRow       bool
+	SameColumn    bool
+	RequiresOrder bool
+	NoRoomBetween bool
+}
+
+type ConstraintSet struct {
+	Discovered map[RoomID]struct{}
+	Relations  []ConstraintRelation
+}
+
 type SolverContext struct {
-	Rooms             map[RoomID]SolverRoomState
-	NoRoomBetweenAxis func(func(RoomID) (int, int, bool), RoomID, RoomID, int, int, int, int) bool
-	Debugln           func(...any)
-	Debugf            func(string, ...any)
+	Rooms                 map[RoomID]SolverRoomState
+	NoRoomBetweenAxis     func(func(RoomID) (int, int, bool), RoomID, RoomID, int, int, int, int) bool
+	EdgeAlignedAndOrdered func(int, int, int, int, string) bool
+	DirDelta              func(string) (int, int, bool)
+	ColName               func(int) string
+	Debugln               func(...any)
+	Debugf                func(string, ...any)
 }
-
-type SolverEngine interface {
-	ValidateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error
-	ComputeRebuildResult(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) (RebuildResult, error)
-}
-
-type SolverProvider func(SolverContext) SolverEngine
 
 type SolverRoomState struct {
 	Placed bool
@@ -35,6 +55,24 @@ type RebuildResult struct {
 	Rooms   map[RoomID]RebuildRoomState
 	Occ     map[[2]int]RoomID
 	Current RoomID
+}
+
+type SolverEngine interface {
+	ValidateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error
+	ComputeRebuildResult(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) (RebuildResult, error)
+}
+
+type SolverProvider func(SolverContext) SolverEngine
+
+type LockedAdjViolationError struct {
+	Key       LockedAdjKey
+	ExpectedR int
+	ExpectedC int
+}
+
+func (e *LockedAdjViolationError) Error() string {
+	return fmt.Sprintf("mapping invariant: candidate move would break locked adjacency %s -%s-> %s",
+		e.Key.From, e.Key.Dir, e.Key.To)
 }
 
 type ConstraintSolver struct {
@@ -62,9 +100,9 @@ func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter fu
 		if !okFrom || !okTo {
 			return fmt.Errorf("mapping invariant: locked adjacency references unplaced room: %s -%s-> %s", k.From, k.Dir, k.To)
 		}
-		if rel.RequiresOrder && !edgeAlignedAndOrdered(fromR, fromC, toR, toC, k.Dir) {
-			expDr, expDc, _ := dirDelta(k.Dir)
-			return &lockedAdjViolationError{
+		if rel.RequiresOrder && !s.ctx.EdgeAlignedAndOrdered(fromR, fromC, toR, toC, k.Dir) {
+			expDr, expDc, _ := s.ctx.DirDelta(k.Dir)
+			return &LockedAdjViolationError{
 				Key:       k,
 				ExpectedR: expDr,
 				ExpectedC: expDc,
@@ -72,8 +110,8 @@ func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter fu
 		}
 		if rel.NoRoomBetween &&
 			!s.ctx.NoRoomBetweenAxis(coordAfter, k.From, k.To, fromR, fromC, toR, toC) {
-			expDr, expDc, _ := dirDelta(k.Dir)
-			return &lockedAdjViolationError{
+			expDr, expDc, _ := s.ctx.DirDelta(k.Dir)
+			return &LockedAdjViolationError{
 				Key:       k,
 				ExpectedR: expDr,
 				ExpectedC: expDc,
@@ -95,7 +133,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		rooms[fromID] = SolverRoomState{}
 	}
 
-	drMove, dcMove, ok := dirDelta(dirMoved)
+	drMove, dcMove, ok := s.ctx.DirDelta(dirMoved)
 	if !ok {
 		return RebuildResult{}, fmt.Errorf("mapping error: rebuild got unsupported direction %q", dirMoved)
 	}
@@ -128,7 +166,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		if _, ok := discovered[k.To]; !ok {
 			continue
 		}
-		dr, dc, ok := dirDelta(k.Dir)
+		dr, dc, ok := s.ctx.DirDelta(k.Dir)
 		if !ok {
 			continue
 		}
@@ -242,7 +280,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 					}
 				}
 			}
-			return fmt.Errorf("mapping error: unable to place %s near (R=%d,C=%s)", id, wantR, colName(wantC))
+			return fmt.Errorf("mapping error: unable to place %s near (R=%d,C=%s)", id, wantR, s.ctx.ColName(wantC))
 		}
 
 		fromBase := [2]int{0, 0}
@@ -264,7 +302,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		if occID, taken := occ[enterTarget]; taken && occID != enterID {
 			if _, anchoredOcc := anchored[occID]; anchoredOcc {
 				return nil, nil, fmt.Errorf("mapping error: local repack blocked by anchored room %s at target (R=%d,C=%s)",
-					occID, enterR, colName(enterC))
+					occID, enterR, s.ctx.ColName(enterC))
 			}
 			delete(coords, occID)
 			delete(occ, enterTarget)
