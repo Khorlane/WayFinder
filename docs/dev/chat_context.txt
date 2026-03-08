@@ -64,8 +64,6 @@ CURRENT REPOSITORY STRUCTURE
 WayFinder/
 │
 ├── main.go
-├── solver/
-│   └── solver.go
 ├── wcs/
 │   ├── telnet/
 │   └── win32/
@@ -74,7 +72,8 @@ WayFinder/
 ├── wmr/
 │   ├── runtime.go
 │   ├── local_mode.go
-│   └── local_mud_output.go
+│   ├── local_mud_output.go
+│   └── solver.go
 ├── wne/
 │   ├── navigation_session.go
 │   └── navigation_session_test.go

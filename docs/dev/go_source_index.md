@@ -28,8 +28,6 @@ WayFinder/
 │   ├── ...
 │   └── WildernessTrailJunction385.txt
 │   (465 files total)
-├── solver/
-│   └── solver.go
 ├── wcs/
 │   ├── telnet/
 │   └── win32/
@@ -38,7 +36,8 @@ WayFinder/
 ├── wmr/
 │   ├── local_mode.go
 │   ├── local_mud_output.go
-│   └── runtime.go
+│   ├── runtime.go
+│   └── solver.go
 ├── wne/
 │   ├── navigation_session.go
 │   └── navigation_session_test.go
@@ -58,12 +57,12 @@ WayFinder/
 
 - `docs/dev/scripts/generate_go_source_index.go`
 - `main.go`
-- `solver/solver.go`
 - `wcs/win32/proc_windows.go`
 - `wcs/win32/shell_windows.go`
 - `wmr/local_mode.go`
 - `wmr/local_mud_output.go`
 - `wmr/runtime.go`
+- `wmr/solver.go`
 - `wne/navigation_session.go`
 - `wne/navigation_session_test.go`
 
@@ -99,31 +98,6 @@ Functions:
 
 Variables:
 - (none)
-
-## `solver/solver.go`
-
-Types:
-- RoomID (line 8)
-- LockedAdjKey (line 10)
-- ConstraintRelation (line 16)
-- ConstraintSet (line 27)
-- SolverContext (line 32)
-- SolverRoomState (line 42)
-- RebuildRoomState (line 48)
-- RebuildResult (line 54)
-- SolverEngine (line 60)
-- SolverProvider (line 65)
-- LockedAdjViolationError (line 67)
-- ConstraintSolver (line 78)
-
-Functions:
-- Error (method on *LockedAdjViolationError) (line 73)
-- NewConstraintSolver (line 82)
-- ValidateConstraintSet (method on *ConstraintSolver) (line 92)
-- ComputeRebuildResult (method on *ConstraintSolver) (line 124)
-
-Variables:
-- DefaultSolverProvider (line 86)
 
 ## `wcs/win32/proc_windows.go`
 
@@ -247,77 +221,102 @@ Variables:
 ## `wmr/runtime.go`
 
 Types:
-- RoomID (line 25)
-- Room (line 27)
-- Mapper (line 33)
-- lockedAdjKey (line 43)
-- ConstraintRelation (line 49)
-- ConstraintSet (line 60)
-- lockedAdjViolationError (line 142)
-- collisionError (line 153)
-- roomSnapshot (line 165)
-- mapperSnapshot (line 171)
-- plannedMove (line 1007)
-- Topology (line 1644)
+- RoomID (line 23)
+- Room (line 25)
+- Mapper (line 31)
+- lockedAdjKey (line 41)
+- ConstraintRelation (line 47)
+- ConstraintSet (line 58)
+- lockedAdjViolationError (line 140)
+- collisionError (line 151)
+- roomSnapshot (line 163)
+- mapperSnapshot (line 169)
+- plannedMove (line 1005)
+- Topology (line 1642)
 
 Functions:
-- relationForKey (line 65)
-- BuildConstraintSet (method on *Mapper) (line 83)
-- Error (method on *lockedAdjViolationError) (line 148)
-- Error (method on *collisionError) (line 160)
-- uiPrint (line 179)
-- uiPrintf (line 183)
-- uiPrintln (line 187)
-- setupLogging (line 191)
-- NewMapper (line 206)
-- BindTopology (method on *Mapper) (line 217)
-- SetDebugWriter (method on *Mapper) (line 221)
-- SetSolverProvider (method on *Mapper) (line 229)
-- debugln (method on *Mapper) (line 237)
-- debugf (method on *Mapper) (line 241)
-- colName (line 245)
-- cellLabel (line 247)
-- normalizeDirName (line 260)
-- dirDelta (line 286)
-- getRoom (method on *Mapper) (line 311)
-- clearOcc (method on *Mapper) (line 320)
-- setOcc (method on *Mapper) (line 328)
-- edgeAlignedAndOrdered (line 349)
-- roomBetweenAxis (line 372)
-- noRoomBetweenAxis (method on *Mapper) (line 390)
-- refreshLockedAdjacencies (method on *Mapper) (line 410)
-- validateLockedAdjacencies (method on *Mapper) (line 441)
-- validateConstraintSet (method on *Mapper) (line 445)
-- solverContext (method on *Mapper) (line 465)
-- solver (method on *Mapper) (line 493)
-- toSolverConstraintSet (method on *Mapper) (line 501)
-- shiftWhere (method on *Mapper) (line 528)
-- blockKey (line 605)
-- formatBlockRooms (line 614)
-- cloneBlock (line 623)
-- printRejection (method on *Mapper) (line 631)
-- destinationCandidateBlocks (method on *Mapper) (line 651)
-- moveDestinationWithCandidates (method on *Mapper) (line 758)
-- validateBlockMove (method on *Mapper) (line 851)
-- moveBlock (method on *Mapper) (line 920)
-- captureSnapshot (method on *Mapper) (line 937)
-- restoreSnapshot (method on *Mapper) (line 962)
-- stateSignature (method on *Mapper) (line 979)
-- holeOpenNow (method on *Mapper) (line 997)
-- smallestBlocks (line 1014)
-- planningBlocks (line 1030)
-- blockHasID (line 1077)
-- plannerDeltas (line 1082)
-- planMakeRoomMultiStepDepth (method on *Mapper) (line 1109)
-- planMakeRoomMultiStep (method on *Mapper) (line 1256)
-- validateHoleOpens (method on *Mapper) (line 1305)
-- makeRoom (method on *Mapper) (line 1344)
-- rebuildDiscoveredLayout (method on *Mapper) (line 1480)
-- Enter (method on *Mapper) (line 1513)
-- enterIncremental (method on *Mapper) (line 1531)
+- relationForKey (line 63)
+- BuildConstraintSet (method on *Mapper) (line 81)
+- Error (method on *lockedAdjViolationError) (line 146)
+- Error (method on *collisionError) (line 158)
+- uiPrint (line 177)
+- uiPrintf (line 181)
+- uiPrintln (line 185)
+- setupLogging (line 189)
+- NewMapper (line 204)
+- BindTopology (method on *Mapper) (line 215)
+- SetDebugWriter (method on *Mapper) (line 219)
+- SetSolverProvider (method on *Mapper) (line 227)
+- debugln (method on *Mapper) (line 235)
+- debugf (method on *Mapper) (line 239)
+- colName (line 243)
+- cellLabel (line 245)
+- normalizeDirName (line 258)
+- dirDelta (line 284)
+- getRoom (method on *Mapper) (line 309)
+- clearOcc (method on *Mapper) (line 318)
+- setOcc (method on *Mapper) (line 326)
+- edgeAlignedAndOrdered (line 347)
+- roomBetweenAxis (line 370)
+- noRoomBetweenAxis (method on *Mapper) (line 388)
+- refreshLockedAdjacencies (method on *Mapper) (line 408)
+- validateLockedAdjacencies (method on *Mapper) (line 439)
+- validateConstraintSet (method on *Mapper) (line 443)
+- solverContext (method on *Mapper) (line 463)
+- solver (method on *Mapper) (line 491)
+- toSolverConstraintSet (method on *Mapper) (line 499)
+- shiftWhere (method on *Mapper) (line 526)
+- blockKey (line 603)
+- formatBlockRooms (line 612)
+- cloneBlock (line 621)
+- printRejection (method on *Mapper) (line 629)
+- destinationCandidateBlocks (method on *Mapper) (line 649)
+- moveDestinationWithCandidates (method on *Mapper) (line 756)
+- validateBlockMove (method on *Mapper) (line 849)
+- moveBlock (method on *Mapper) (line 918)
+- captureSnapshot (method on *Mapper) (line 935)
+- restoreSnapshot (method on *Mapper) (line 960)
+- stateSignature (method on *Mapper) (line 977)
+- holeOpenNow (method on *Mapper) (line 995)
+- smallestBlocks (line 1012)
+- planningBlocks (line 1028)
+- blockHasID (line 1075)
+- plannerDeltas (line 1080)
+- planMakeRoomMultiStepDepth (method on *Mapper) (line 1107)
+- planMakeRoomMultiStep (method on *Mapper) (line 1254)
+- validateHoleOpens (method on *Mapper) (line 1303)
+- makeRoom (method on *Mapper) (line 1342)
+- rebuildDiscoveredLayout (method on *Mapper) (line 1478)
+- Enter (method on *Mapper) (line 1511)
+- enterIncremental (method on *Mapper) (line 1529)
 
 Variables:
-- uiOut (line 177)
+- uiOut (line 175)
+
+## `wmr/solver.go`
+
+Types:
+- SolverRoomID (line 8)
+- SolverLockedAdjKey (line 10)
+- SolverConstraintRelation (line 16)
+- SolverConstraintSet (line 27)
+- SolverContext (line 32)
+- SolverRoomState (line 42)
+- RebuildRoomState (line 48)
+- RebuildResult (line 54)
+- SolverEngine (line 60)
+- SolverProvider (line 65)
+- LockedAdjViolationError (line 67)
+- ConstraintSolver (line 78)
+
+Functions:
+- Error (method on *LockedAdjViolationError) (line 73)
+- NewConstraintSolver (line 82)
+- ValidateConstraintSet (method on *ConstraintSolver) (line 92)
+- ComputeRebuildResult (method on *ConstraintSolver) (line 124)
+
+Variables:
+- DefaultSolverProvider (line 86)
 
 ## `wne/navigation_session.go`
 

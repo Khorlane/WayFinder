@@ -1,20 +1,20 @@
-package solver
+package wmr
 
 import (
 	"fmt"
 	"sort"
 )
 
-type RoomID string
+type SolverRoomID string
 
-type LockedAdjKey struct {
-	From RoomID
-	To   RoomID
+type SolverLockedAdjKey struct {
+	From SolverRoomID
+	To   SolverRoomID
 	Dir  string
 }
 
-type ConstraintRelation struct {
-	Key           LockedAdjKey
+type SolverConstraintRelation struct {
+	Key           SolverLockedAdjKey
 	Locked        bool
 	Enforced      bool
 	AxisAligned   bool
@@ -24,14 +24,14 @@ type ConstraintRelation struct {
 	NoRoomBetween bool
 }
 
-type ConstraintSet struct {
-	Discovered map[RoomID]struct{}
-	Relations  []ConstraintRelation
+type SolverConstraintSet struct {
+	Discovered map[SolverRoomID]struct{}
+	Relations  []SolverConstraintRelation
 }
 
 type SolverContext struct {
-	Rooms                 map[RoomID]SolverRoomState
-	NoRoomBetweenAxis     func(func(RoomID) (int, int, bool), RoomID, RoomID, int, int, int, int) bool
+	Rooms                 map[SolverRoomID]SolverRoomState
+	NoRoomBetweenAxis     func(func(SolverRoomID) (int, int, bool), SolverRoomID, SolverRoomID, int, int, int, int) bool
 	EdgeAlignedAndOrdered func(int, int, int, int, string) bool
 	DirDelta              func(string) (int, int, bool)
 	ColName               func(int) string
@@ -52,20 +52,20 @@ type RebuildRoomState struct {
 }
 
 type RebuildResult struct {
-	Rooms   map[RoomID]RebuildRoomState
-	Occ     map[[2]int]RoomID
-	Current RoomID
+	Rooms   map[SolverRoomID]RebuildRoomState
+	Occ     map[[2]int]SolverRoomID
+	Current SolverRoomID
 }
 
 type SolverEngine interface {
-	ValidateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error
-	ComputeRebuildResult(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) (RebuildResult, error)
+	ValidateConstraintSet(cs SolverConstraintSet, coordAfter func(SolverRoomID) (int, int, bool)) error
+	ComputeRebuildResult(cs SolverConstraintSet, enterID, fromID SolverRoomID, dirMoved string) (RebuildResult, error)
 }
 
 type SolverProvider func(SolverContext) SolverEngine
 
 type LockedAdjViolationError struct {
-	Key       LockedAdjKey
+	Key       SolverLockedAdjKey
 	ExpectedR int
 	ExpectedC int
 }
@@ -89,7 +89,7 @@ var DefaultSolverProvider SolverProvider = func(ctx SolverContext) SolverEngine 
 
 var _ SolverEngine = (*ConstraintSolver)(nil)
 
-func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error {
+func (s *ConstraintSolver) ValidateConstraintSet(cs SolverConstraintSet, coordAfter func(SolverRoomID) (int, int, bool)) error {
 	for _, rel := range cs.Relations {
 		if !rel.Enforced {
 			continue
@@ -121,8 +121,8 @@ func (s *ConstraintSolver) ValidateConstraintSet(cs ConstraintSet, coordAfter fu
 	return nil
 }
 
-func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) (RebuildResult, error) {
-	rooms := make(map[RoomID]SolverRoomState, len(s.ctx.Rooms)+2)
+func (s *ConstraintSolver) ComputeRebuildResult(cs SolverConstraintSet, enterID, fromID SolverRoomID, dirMoved string) (RebuildResult, error) {
+	rooms := make(map[SolverRoomID]SolverRoomState, len(s.ctx.Rooms)+2)
 	for id, rs := range s.ctx.Rooms {
 		rooms[id] = rs
 	}
@@ -138,7 +138,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		return RebuildResult{}, fmt.Errorf("mapping error: rebuild got unsupported direction %q", dirMoved)
 	}
 
-	discovered := make(map[RoomID]struct{}, len(cs.Discovered)+2)
+	discovered := make(map[SolverRoomID]struct{}, len(cs.Discovered)+2)
 	for id := range cs.Discovered {
 		discovered[id] = struct{}{}
 	}
@@ -153,11 +153,11 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 	discovered[fromID] = struct{}{}
 
 	type edge struct {
-		to RoomID
+		to SolverRoomID
 		dr int
 		dc int
 	}
-	adj := make(map[RoomID][]edge)
+	adj := make(map[SolverRoomID][]edge)
 	for _, rel := range cs.Relations {
 		k := rel.Key
 		if _, ok := discovered[k.From]; !ok {
@@ -183,11 +183,11 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 			return adj[from][i].to < adj[from][j].to
 		})
 	}
-	neighbors := func(id RoomID) []edge {
+	neighbors := func(id SolverRoomID) []edge {
 		return adj[id]
 	}
 
-	oldPos := make(map[RoomID][2]int)
+	oldPos := make(map[SolverRoomID][2]int)
 	for id, r := range rooms {
 		if !r.Placed {
 			continue
@@ -198,9 +198,9 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		oldPos[id] = [2]int{r.R, r.C}
 	}
 
-	affected := make(map[RoomID]struct{})
+	affected := make(map[SolverRoomID]struct{})
 	type qItem struct {
-		id    RoomID
+		id    SolverRoomID
 		depth int
 	}
 	q := []qItem{{id: fromID, depth: 0}, {id: enterID, depth: 0}}
@@ -223,10 +223,10 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		}
 	}
 
-	layoutApprox := func(anchorOutside bool) (map[RoomID][2]int, map[[2]int]RoomID, error) {
-		coords := make(map[RoomID][2]int)
-		occ := make(map[[2]int]RoomID)
-		anchored := make(map[RoomID]struct{})
+	layoutApprox := func(anchorOutside bool) (map[SolverRoomID][2]int, map[[2]int]SolverRoomID, error) {
+		coords := make(map[SolverRoomID][2]int)
+		occ := make(map[[2]int]SolverRoomID)
+		anchored := make(map[SolverRoomID]struct{})
 
 		if anchorOutside {
 			for id := range discovered {
@@ -243,7 +243,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 			}
 		}
 
-		placeNear := func(id RoomID, wantR, wantC int) error {
+		placeNear := func(id SolverRoomID, wantR, wantC int) error {
 			if _, placed := coords[id]; placed {
 				return nil
 			}
@@ -310,8 +310,8 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		coords[enterID] = enterTarget
 		occ[enterTarget] = enterID
 
-		bfs := []RoomID{fromID, enterID}
-		seen := map[RoomID]struct{}{fromID: {}, enterID: {}}
+		bfs := []SolverRoomID{fromID, enterID}
+		seen := map[SolverRoomID]struct{}{fromID: {}, enterID: {}}
 		for len(bfs) > 0 {
 			id := bfs[0]
 			bfs = bfs[1:]
@@ -338,7 +338,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		}
 		sort.Strings(ids)
 		for _, sid := range ids {
-			id := RoomID(sid)
+			id := SolverRoomID(sid)
 			if _, ok := coords[id]; ok {
 				continue
 			}
@@ -375,7 +375,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs ConstraintSet, enterID, fromI
 		return RebuildResult{}, fmt.Errorf("mapping error: repack did not satisfy immediate move %s -%s-> %s", fromID, dirMoved, enterID)
 	}
 
-	roomStates := make(map[RoomID]RebuildRoomState, len(rooms))
+	roomStates := make(map[SolverRoomID]RebuildRoomState, len(rooms))
 	for id := range rooms {
 		if rc, ok := coords[id]; ok {
 			roomStates[id] = RebuildRoomState{Placed: true, R: rc[0], C: rc[1]}
