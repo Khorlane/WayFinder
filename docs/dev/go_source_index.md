@@ -9,6 +9,7 @@ Generated from current `.go` files using Go AST (`go/parser`, `go/ast`, `go/toke
 - `solver/solver.go`
 - `wcs/win32/proc_windows.go`
 - `wcs/win32/shell_windows.go`
+- `wmr/local_mud_output.go`
 - `wmr/runtime.go`
 - `wne/navigation_session.go`
 - `wne/navigation_session_test.go`
@@ -122,6 +123,27 @@ Variables:
 - hWOVLbl (line 89)
 - hWICLbl (line 90)
 - hWMPLbl (line 91)
+
+## `wmr/local_mud_output.go`
+
+Types:
+- localRoomPresentation (line 21)
+
+Functions:
+- emitLocalPrompt (line 28)
+- emitSimulatedRoomOutput (line 32)
+- emitSimulatedMoveFailure (line 49)
+- emitSimulatedSystemText (line 60)
+- loadLocalRoomPresentation (line 66)
+- normalizeDescription (line 117)
+- wrapDescriptionLines (line 132)
+- formatSimulatedExits (line 155)
+- exitSortRank (line 180)
+- formatExitDisplayName (line 203)
+- toRoomIDExits (line 230)
+
+Variables:
+- (none)
 
 ## `wmr/runtime.go`
 

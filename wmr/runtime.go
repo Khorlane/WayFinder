@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
+	"WayFinder/solver"
 	wcswin32 "WayFinder/wcs/win32"
 	"WayFinder/wne"
-	"WayFinder/solver"
 )
 
 type RoomID string
@@ -1844,7 +1844,7 @@ func discoveredRoomIDs(discovery *DiscoveryState) []RoomID {
 	return ids
 }
 
-func toWNERoomID(id RoomID) wne.RoomID { return wne.RoomID(id) }
+func toWNERoomID(id RoomID) wne.RoomID   { return wne.RoomID(id) }
 func fromWNERoomID(id wne.RoomID) RoomID { return RoomID(id) }
 
 type wneTopologyAdapter struct {
@@ -2092,70 +2092,38 @@ func Run(args []string) int {
 	}
 
 	uiPrintln("Commands: n s e w ne nw se sw | look | map | coords | show | gui | quit")
-	uiPrintln()
+	emitSimulatedRoomOutput(worldPath, RoomID(session.CurrentRoom()), toRoomIDExits(session.CurrentExits()))
+	mapper.PrintGrid10x10Discovered(discovery)
 
 	in := bufio.NewReader(os.Stdin)
 	for {
-		cur := session.CurrentRoom()
-		uiPrintln()
-		uiPrintf("%s\n", string(cur))
-		// Always show true exits from the current room in the room prompt.
-		ex := session.CurrentExits()
-		if len(ex) == 0 {
-			uiPrintln("Exits: (none)")
-		} else {
-			var dirs []string
-			for d := range ex {
-				dirs = append(dirs, d)
-			}
-			sort.Strings(dirs)
-			uiPrint("Exits: ")
-			for i, d := range dirs {
-				if i > 0 {
-					uiPrint(" ")
-				}
-				uiPrintf("%s(%s)", d, string(ex[d]))
-			}
-			uiPrintln()
-		}
-		uiPrint("> ")
+		emitLocalPrompt()
 		line, _ := in.ReadString('\n')
 		line = strings.TrimSpace(strings.ToLower(line))
 		if line == "" {
+			uiPrintln()
 			continue
 		}
 
 		switch line {
 		case "quit", "exit":
+			uiPrintln()
 			return 0
 		case "gui":
+			uiPrintln()
 			wcswin32.RunWCS()
 		case "look":
-			uiPrintf("You are in Room %s\n", string(cur))
-			// "look" should also show true exits for the current room.
-			ex := session.CurrentExits()
-			if len(ex) == 0 {
-				uiPrintln("Exits: (none)")
-				break
-			}
-			var dirs []string
-			for d := range ex {
-				dirs = append(dirs, d)
-			}
-			sort.Strings(dirs)
-			uiPrint("Exits: ")
-			for i, d := range dirs {
-				if i > 0 {
-					uiPrint(" ")
-				}
-				uiPrintf("%s(%s)", d, string(ex[d]))
-			}
 			uiPrintln()
+			emitSimulatedRoomOutput(worldPath, RoomID(session.CurrentRoom()), toRoomIDExits(session.CurrentExits()))
+			mapper.PrintGrid10x10Discovered(discovery)
 		case "map":
+			uiPrintln()
 			mapper.PrintGrid10x10Discovered(discovery)
 		case "coords":
+			uiPrintln()
 			mapper.PrintRoomsDiscovered(world, discovery)
 		case "show":
+			uiPrintln()
 			ids := discoveredRoomIDs(discovery)
 			uiPrintln("Discovered rooms:")
 			if len(ids) == 0 {
@@ -2169,18 +2137,22 @@ func Run(args []string) int {
 			// movement: only N/S/E/W
 			dir := normalizeDirName(line)
 			if dir == "" {
-				uiPrintln("HUH?")
+				uiPrintln()
+				emitSimulatedSystemText("Huh?")
 				continue
 			}
 			if err := session.Move(dir); err != nil {
 				if err.Error() == "no exit that way" {
-					uiPrintln("No exit that way.")
+					uiPrintln()
+					emitSimulatedMoveFailure(dir)
 					continue
 				}
-				uiPrintln("Mapper error:", err)
+				uiPrintln()
+				emitSimulatedSystemText(fmt.Sprintf("System: %v", err))
 				continue
 			}
-			// Show map after every move
+			uiPrintln()
+			emitSimulatedRoomOutput(worldPath, RoomID(session.CurrentRoom()), toRoomIDExits(session.CurrentExits()))
 			mapper.PrintGrid10x10Discovered(discovery)
 		}
 	}
