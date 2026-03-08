@@ -20,11 +20,15 @@ HIGH LEVEL ARCHITECTURE
 WayFinder
 │
 ├── WayFinder Client Shell (WCS)
-│      - Telnet client
-│      - UI framework (Fyne)
+│      - application window host
 │      - command input
 │      - MUD output display
+│      - map panel host (WMP)
 │      - event routing
+│
+├── WayFinder Event Gateway (WEG)
+│      - MUD text parsing
+│      - normalized event emission
 │
 ├── WayFinder Navigation Engine (WNE)
 │      - navigation session
@@ -37,10 +41,15 @@ WayFinder
 │      - rebuild logic
 │      - layout projection
 │
-└── WayFinder Render Pipeline (WRP)
-       - renders map grid
-       - currently CLI grid renderer
-       - future Fyne map panel
+└── WayFinder Map Panel (WMP)
+       - hosted inside WCS
+       - displays map data produced by WMR
+
+Runtime flow:
+WCS → WEG → WNE → WMR
+
+Important:
+WMP is a UI panel owned by WCS, not a separate pipeline stage.
 
 ------------------------------------------------
 CURRENT IMPLEMENTATION STATUS
@@ -92,6 +101,12 @@ WayFinder/
 ├── navigation_session.go
 ├── navigation_session_test.go
 │
+├── internal/
+│   └── wcs/
+│       └── win32/
+│           ├── shell_windows.go
+│           └── proc_windows.go
+│
 ├── solver/
 │      solver.go
 │
@@ -100,6 +115,7 @@ WayFinder/
 │      mapper_rules.md
 │      discovery_model.md
 │      dev/llm_context.txt
+│      dev/chat_context.txt
 │
 ├── go.mod
 ├── README.md
@@ -199,11 +215,12 @@ FUTURE WORK
 library:
 github.com/reiver/go-telnet
 
-2. GUI client
-framework:
-github.com/fyne-io/fyne
+2. WCS integration upgrades (Win32)
+- route real command input/output through WCS panels
+- connect WCS ports to WEG/WNE/WMR
+- keep WCS as a thin shell (no parsing/navigation/topology logic)
 
-UI layout target:
+UI layout target (already stubbed):
 
 +----------------------+---------------+
 | MUD output window    | Map panel     |
@@ -214,15 +231,16 @@ UI layout target:
 +--------------------------------------+
 
 3. Renderer
-Replace CLI grid renderer with Fyne canvas renderer.
+Replace placeholder map panel text with WMR-driven map drawing in WMP (no Fyne dependency).
 
 ------------------------------------------------
 NAMING CONVENTIONS
 
 WayFinder Client Shell (WCS)
+WayFinder Event Gateway (WEG)
 WayFinder Navigation Engine (WNE)
 WayFinder Mapping Runtime (WMR)
-WayFinder Render Pipeline (WRP)
+WayFinder Map Panel (WMP)
 
 ------------------------------------------------
 CURRENT DEVELOPMENT WORKFLOW
@@ -233,22 +251,19 @@ CURRENT DEVELOPMENT WORKFLOW
 4. Updated files reviewed
 5. Next task generated
 
+Canonical task tracker: docs/dev/ToDo.md
+
 ------------------------------------------------
 CURRENT STATUS SUMMARY
 
 Mapping engine: complete
 Solver architecture: complete
-Package separation: mostly complete
+Package separation: in progress (solver complete, WCS Win32 package added)
 Telnet integration: not started
-GUI: not started
+GUI: started (Win32 WCS stub available via `gui` command)
 
 Estimated completion: ~70-75%
 
-Remaining work is mostly integration and UI.
+Remaining work is mostly WCS/WEG integration, telnet integration, and map panel rendering.
 
 ------------------------------------------------
-
-design only discussion. So, with the bare minimum of changes and
-leveraging github.com/reiver/go-telnet, can we modify so that we 
-can either use the current world navigation (proven to work) or
-switch to connecting to the mud at www.holyquest.org:7373

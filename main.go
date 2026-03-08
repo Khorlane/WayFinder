@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	wcswin32 "WayFinder/internal/wcs/win32"
 	"WayFinder/solver"
 )
 
@@ -2009,7 +2010,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	uiPrintln("Commands: n s e w ne nw se sw | look | map | coords | show | quit")
+	uiPrintln("Commands: n s e w ne nw se sw | look | map | coords | show | gui | quit")
 	uiPrintln()
 
 	in := bufio.NewReader(os.Stdin)
@@ -2046,6 +2047,8 @@ func main() {
 		switch line {
 		case "quit", "exit":
 			return
+		case "gui":
+			wcswin32.RunWCS()
 		case "look":
 			uiPrintf("You are in Room %s\n", string(cur))
 			// "look" should also show true exits for the current room.
