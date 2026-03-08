@@ -1,286 +1,149 @@
-
 WAYFINDER PROJECT CONTEXT
-Paste this into a new ChatGPT session to continue the conversation with full context.
+Paste this into a new ChatGPT or Codex session to restore project context.
 
 ------------------------------------------------
 PROJECT: WayFinder
 Language: Go
-Repository: WayFinder (local project, public GitHub repo)
+Repository: WayFinder
 
 Purpose:
-WayFinder is a MUD navigation client and automapper. It connects to a MUD via telnet,
-discovers rooms incrementally, and builds a spatial grid map based on directional exits.
+WayFinder is a MUD navigation client and automapper. It connects to a MUD via
+telnet, discovers rooms incrementally, and builds a spatial grid map based on
+directional exits.
 
-The map is NOT preloaded from the world files when used with a real MUD.
-Rooms are discovered dynamically as the player moves.
+Rooms are discovered dynamically as the player moves. The map is not preloaded
+when connected to a live MUD.
 
 ------------------------------------------------
-HIGH LEVEL ARCHITECTURE
+ARCHITECTURE SOURCE OF TRUTH
 
-WayFinder
-│
-├── WayFinder Client Shell (WCS)
-│      - application window host
-│      - command input
-│      - MUD output display
-│      - map panel host (WMP)
-│      - event routing
-│
-├── WayFinder Event Gateway (WEG)
-│      - MUD text parsing
-│      - normalized event emission
-│
-├── WayFinder Navigation Engine (WNE)
-│      - navigation session
-│      - discovery tracking
-│      - topology events
-│
-├── WayFinder Mapping Runtime (WMR)
-│      - incremental room placement
-│      - spatial constraints
-│      - rebuild logic
-│      - layout projection
-│
-└── WayFinder Map Panel (WMP)
-       - hosted inside WCS
-       - displays map data produced by WMR
+The authoritative architecture description lives in:
 
-Runtime flow:
+docs/architecture.md
+
+If this file and docs/architecture.md ever disagree, docs/architecture.md is
+correct.
+
+This file is a bootstrap context for AI coding sessions. It is not the full
+architecture specification.
+
+Architecture changes must be explicitly requested by the developer.
+
+AI agents must NOT:
+- invent new subsystems
+- introduce alternate architectural layers
+- move responsibilities between subsystems
+- reintroduce other UI frameworks unless explicitly requested
+
+------------------------------------------------
+ARCHITECTURE SUMMARY
+
+Subsystems:
+
+WCS — WayFinder Client Shell
+WMP — WayFinder Map Panel
+WEG — WayFinder Event Gateway
+WNE — WayFinder Navigation Engine
+WMR — WayFinder Mapping Runtime
+solver — constraint/rebuild support used by WMR
+
+Runtime pipeline:
+
 WCS → WEG → WNE → WMR
 
-Important:
-WMP is a UI panel owned by WCS, not a separate pipeline stage.
+Notes:
+- WMP is a UI panel hosted inside WCS
+- WMP is NOT part of the runtime pipeline
+- WMR computes layout but does NOT render UI
+- WCS currently uses a Win32 implementation
+- Full subsystem definitions live in docs/architecture.md
 
 ------------------------------------------------
-CURRENT IMPLEMENTATION STATUS
-
-Core Mapping Engine:
-DONE
-
-Features implemented:
-- incremental map construction
-- discovery model (rooms only appear when discovered)
-- ordered alignment constraints
-- lane reservation (no rooms inserted between locked pairs)
-- correction engine
-- makeRoom algorithm
-- multi-step planner fallback
-- rebuild fallback
-- topology constraints preserved
-
-Solver Architecture:
-DONE
-
-Structure:
-
-Mapper
-   ↓
-SolverEngine interface
-   ↓
-ConstraintSolver implementation
-
-Solver extracted to its own package:
-
-solver/
-    solver.go
-
-Solver API:
-- ValidateConstraintSet()
-- ComputeRebuildResult()
-
-Mapper converts internal structures into solver structures.
-
-Recent completed refactors:
-- WF-003 completed: `main.go` reduced to bootstrap/composition entrypoint (commit: `a5f7625`)
-- WF-004 completed: moved subsystem code to top-level `wcs/`, `wne/`, `wmr/`, `solver/` layout (commit: `f616a65`)
-- WCS Win32 shell remains available from CLI via `gui` command
-
-------------------------------------------------
-CURRENT PROJECT STRUCTURE
-
-Project root:
+CURRENT REPOSITORY STRUCTURE
 
 WayFinder/
 │
 ├── main.go
-│
-├── wcs/
-│   └── win32/
-│       ├── shell_windows.go
-│       └── proc_windows.go
-│
-├── wne/
-│      navigation_session.go
-│      navigation_session_test.go
-│
-├── wmr/
-│      runtime.go
-│
 ├── solver/
-│      solver.go
+│   └── solver.go
+├── wcs/
+│   ├── telnet/
+│   └── win32/
+│       ├── proc_windows.go
+│       └── shell_windows.go
+├── wmr/
+│   ├── runtime.go
+│   ├── local_mode.go
+│   └── local_mud_output.go
+├── wne/
+│   ├── navigation_session.go
+│   └── navigation_session_test.go
 │
 ├── docs/
-│      architecture.md
-│      mapper_rules.md
-│      discovery_model.md
-│      dev/llm_context.txt
-│      dev/chat_context.txt
+│   ├── architecture.md
+│   ├── discovery_model.md
+│   ├── mapper_rules.md
+│   └── dev/
+│       ├── chat_context.txt
+│       ├── llm_context.txt
+│       ├── go_source_index.md
+│       ├── MAINTENANCE.md
+│       └── ToDo.md
 │
-├── go.mod
-├── README.md
-├── LICENSE
-└── .gitignore
+└── Rooms/  (local development world data)
+
+Current repo notes:
+- Local dev harness lives in wmr/local_mode.go
+- Simulated MUD output lives in wmr/local_mud_output.go
+- simmud/ is a legacy cleanup artifact and is not an active subsystem
 
 ------------------------------------------------
-KEY DESIGN RULES
+CURRENT IMPLEMENTATION STATUS
 
-Discovery Model:
-- rooms are discovered as entered
-- exits revealed immediately when room discovered
-- no hidden exits exist in this world
+Mapping runtime: COMPLETE
+Solver: COMPLETE
+Navigation session: COMPLETE
+Local development harness: COMPLETE
 
-Spatial Constraints:
-- N/S relationships require same column
-- E/W relationships require same row
-- ordering must be preserved
-- gaps allowed between rooms
-- no room allowed between locked adjacency pairs
+Remaining work:
+- minimal runtime switch (local vs telnet)
+- telnet integration
+- WEG parser
+- WCS event wiring
+- WMP map rendering
 
-Example:
-D3B above ECE
-
-Valid:
-
-D3B
-ECE
-
-D3B
-.
-ECE
-
-But not:
-
-D3B
-NEWROOM
-ECE
+Estimated completion: ~75–80%
 
 ------------------------------------------------
-MAP LAYOUT MODEL
+AI EDITING RULES
 
-Coordinates are an infinite integer grid.
-
-Rooms contain:
-
-RoomID
-Placed flag
-Row
-Column
-
-Occupancy map tracks which room occupies each cell.
-
-Locks represent discovered adjacencies that must remain valid.
+1. Prefer small surgical edits.
+2. Do NOT create new packages unless clearly required.
+3. Do NOT move logic between subsystems unless explicitly requested.
+4. Keep repository structure stable.
+5. Describe the repository as it exists today, not planned future state.
+6. Do NOT describe planned features as already implemented.
+7. Preserve the current WCS/WEG/WNE/WMR/WMP split.
+8. Keep local simulation support under the current runtime structure unless
+   explicitly redesigned.
 
 ------------------------------------------------
-REBUILD SYSTEM
+SESSION WORKFLOW
 
-When incremental placement cannot resolve conflicts,
-the solver performs a rebuild of the discovered map.
+Typical development workflow:
 
-Rebuild process:
-1. build constraint set
-2. run solver
-3. produce new room layout
-4. mapper applies results
+1. ChatGPT designs the next change.
+2. Codex implements the change.
+3. Build/test succeeds.
+4. If repo structure or architecture summary changed, update
+   docs/dev/chat_context.txt.
+5. Regenerate docs/dev/go_source_index.md after Go file additions, removals,
+   renames, or major signature changes.
 
-------------------------------------------------
-SOLVER PACKAGE
+Canonical task tracker:
+docs/dev/ToDo.md
 
-solver/
-    solver.go
-
-Major types:
-
-SolverContext
-SolverRoomState
-ConstraintSet
-ConstraintRelation
-LockedAdjKey
-RebuildResult
-RebuildRoomState
-
-SolverEngine interface:
-
-ValidateConstraintSet()
-ComputeRebuildResult()
-
-Current implementation:
-
-ConstraintSolver
-
-------------------------------------------------
-FUTURE WORK
-
-1. Telnet integration
-library:
-github.com/reiver/go-telnet
-
-2. WCS integration upgrades (Win32)
-- route real command input/output through WCS panels
-- connect WCS ports to WEG/WNE/WMR
-- keep WCS as a thin shell (no parsing/navigation/topology logic)
-
-UI layout target (already stubbed):
-
-+----------------------+---------------+
-| MUD output window    | Map panel     |
-|                      |               |
-|                      |               |
-+----------------------+---------------+
-| Command input field                  |
-+--------------------------------------+
-
-3. Renderer
-Replace placeholder map panel text with WMR-driven map drawing in WMP (no Fyne dependency).
-
-------------------------------------------------
-NAMING CONVENTIONS
-
-WayFinder Client Shell (WCS)
-WayFinder Event Gateway (WEG)
-WayFinder Navigation Engine (WNE)
-WayFinder Mapping Runtime (WMR)
-WayFinder Map Panel (WMP)
-
-------------------------------------------------
-CURRENT DEVELOPMENT WORKFLOW
-
-1. ChatGPT designs architecture steps
-2. Instructions given to Codex (VSCode extension)
-3. Codex edits files and ensures build success
-4. Updated files reviewed
-5. Next task generated
-
-Canonical task tracker: docs/dev/ToDo.md
-Canonical Go source inventory: docs/dev/go_source_index.md
-Refresh rule: regenerate `docs/dev/go_source_index.md` after any Go file add/remove/rename or major signature changes.
-Regeneration steps for `go_source_index.md`: docs/dev/MAINTENANCE.md
-Generator implementation: docs/dev/scripts/generate_go_source_index.go (AST-based; includes package-level variables).
-
-------------------------------------------------
-CURRENT STATUS SUMMARY
-
-Mapping engine: complete
-Solver architecture: complete
-Package separation: major structure complete (`wcs/`, `wne/`, `wmr/`, `solver/`)
-Telnet integration: not started
-GUI: started (Win32 WCS stub available via `gui` command)
-
-Estimated completion: ~75-80%
-
-Top open TODOs:
-- WF-001 minimal runtime switch: local world navigation vs live telnet (`www.holyquest.org:7373`)
-- WF-002 remove temporary `Rooms/` folder when no longer needed
-
-Remaining work is mostly WCS/WEG integration, telnet integration, and map panel rendering.
+Canonical Go source inventory:
+docs/dev/go_source_index.md
 
 ------------------------------------------------

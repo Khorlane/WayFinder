@@ -1,323 +1,237 @@
 # WayFinder Architecture
 
-## Overview
+## System Overview
 
-WayFinder is a MUD navigation system that builds a readable spatial
-projection of **discovered rooms** while a player explores a world.
+WayFinder is a MUD navigation client and automapper written in Go.
+The system discovers rooms dynamically and constructs a spatial map as the
+player moves through the world.
 
-The system separates:
+The architecture separates UI, parsing, navigation, mapping, and solver logic
+so each subsystem has a clearly defined responsibility.
 
--   **World topology** -- authoritative structure of rooms and exits
--   **Discovery state** -- rooms the player has encountered
--   **Spatial projection** -- a visual layout computed for readability
+---
 
-The layout is not authoritative. It is a **projection** that may be
-rebuilt or repacked when new rooms are discovered.
+## System Model
 
-WayFinder is implemented as a modular system where each component has a
-clearly defined responsibility.
+WayFinder consists of five named subsystems plus solver support:
 
-------------------------------------------------------------------------
+- **WCS** — WayFinder Client Shell
+- **WMP** — WayFinder Map Panel
+- **WEG** — WayFinder Event Gateway
+- **WNE** — WayFinder Navigation Engine
+- **WMR** — WayFinder Mapping Runtime
+- **solver** — constraint/rebuild support used by WMR
 
-# System Component Model
+Runtime flow:
 
-WayFinder is composed of five primary components.
+**WCS → WEG → WNE → WMR**
 
-    WayFinder
-    │
-    ├─ WayFinder Client Shell      (WCS)
-    ├─ WayFinder Event Gateway     (WEG)
-    ├─ WayFinder Navigation Engine (WNE)
-    ├─ WayFinder Mapping Runtime   (WMR)
-    └─ WayFinder Map Panel         (WMP)
+Important:
 
-Each component performs a specific role in the navigation pipeline.
+- **WMP is hosted inside WCS**
+- **WMP is not part of the runtime pipeline**
+- **WMR computes layout but does not render UI**
 
-------------------------------------------------------------------------
+---
 
-# Runtime Data Flow
+## Core Subsystems
 
-    Live MUD Server
-            │
-            ▼
-    WayFinder Client Shell (WCS)
-            │
-            ▼
-    WayFinder Event Gateway (WEG)
-            │
-            ▼
-    WayFinder Navigation Engine (WNE)
-            │
-            ▼
-    WayFinder Mapping Runtime (WMR)
-            │
-            ▼
-    WayFinder Map Panel (WMP)
+## WCS — WayFinder Client Shell
 
-This pipeline ensures clean separation between networking, parsing,
-navigation logic, and UI rendering.
+The application UI shell.
 
-------------------------------------------------------------------------
-
-# Component Responsibilities
-
-## WayFinder Client Shell (WCS)
-
-The Client Shell is the host application.
+Current implementation uses a **Win32 native window**.
 
 Responsibilities:
 
--   Telnet transport using `github.com/reiver/go-telnet`
--   UI framework provided by `github.com/fyne-io/fyne`
--   Command input
--   Display of MUD text output
--   Window management
--   Routing events between components
+- create the main application window
+- display MUD output
+- capture command input
+- host UI panels
+- route UI events and text to runtime components
 
-The shell is responsible for the **overall application lifecycle**.
+WCS is responsible for presentation and user interaction.
+WCS does not own navigation logic, topology logic, or map layout rules.
 
-The shell does not perform navigation or map layout logic.
+---
 
-------------------------------------------------------------------------
+## WMP — WayFinder Map Panel
 
-## WayFinder Event Gateway (WEG)
-
-The Event Gateway converts raw MUD output into normalized navigation
-events.
+A UI panel hosted inside WCS.
 
 Responsibilities:
 
--   Parse room text
--   Detect exits
--   Detect player movement
--   Emit structured events
+- render the map produced by WMR
+- display the current player position
+- display discovered rooms
+- present map output to the user
+
+Important:
+
+- WMP performs rendering only
+- WMP contains no parsing logic
+- WMP contains no navigation logic
+- WMP contains no topology or placement logic
+- WMP is **not part of the runtime pipeline**
+
+WMP is a visual surface, not an authority on map state.
+
+---
+
+## WEG — WayFinder Event Gateway
+
+Responsible for parsing raw MUD output and converting it into normalized events
+used by the navigation system.
 
 Example events:
 
-    EnterRoom(roomID)
-    ExitsSeen(roomID, exits)
-    PlayerCommand(command)
-
-The gateway isolates fragile text parsing from the rest of the system.
-
-------------------------------------------------------------------------
-
-## WayFinder Navigation Engine (WNE)
-
-The Navigation Engine is the core mapping system.
+- room entered
+- exits discovered
+- movement failure
 
 Responsibilities:
 
--   Maintain discovery state
--   Maintain spatial layout of discovered rooms
--   Enforce layout constraints
--   Repack or rebuild layouts when conflicts occur
+- accept raw game text from WCS/telnet input
+- identify navigation-relevant information
+- emit normalized events for WNE consumption
 
-The engine does **not** perform rendering.
+WEG does not own navigation session state or map layout.
 
-It produces an internal representation of the map state.
+---
 
-------------------------------------------------------------------------
+## WNE — WayFinder Navigation Engine
 
-## WayFinder Mapping Runtime (WMR)
-
-The Map Renderer converts navigation state into a visual representation.
+Maintains the navigation session.
 
 Responsibilities:
 
--   Convert room coordinates into renderable structures
--   Preserve spatial readability
--   Apply spacing and layout rules
--   Generate a map model for display
+- track the current room
+- expose movement operations
+- maintain discovered topology
+- coordinate discovery updates
 
-The renderer does not compute navigation logic.
+WNE owns navigation state and discovered-world state, but does not render UI and
+does not compute spatial layout.
 
-------------------------------------------------------------------------
+---
 
-## WayFinder Map Panel (WMP)
+## WMR — WayFinder Mapping Runtime
 
-The Map Panel is the UI component that displays the map.
+Maintains the internal map model and layout.
 
 Responsibilities:
 
--   Display the rendered map
--   Handle resizing
--   Refresh when map state changes
--   Provide future support for zoom and panning
+- incremental room placement
+- enforce spatial constraints
+- maintain adjacency relationships
+- invoke solver support when layout rebuild is required
+- produce the room layout consumed by WMP
 
-The panel reads renderer output but does not modify navigation state.
+Important:
 
-------------------------------------------------------------------------
+WMR computes layout but **does not render UI**.
 
-# Discovery Model
+WMR is the spatial authority for the discovered map layout.
 
-WayFinder builds the map **incrementally** as the player explores.
+---
 
-Rules:
+## solver — Constraint / Rebuild Support
 
--   The system only lays out **discovered rooms**
--   Undiscovered rooms are not placed on the grid
--   Discovery occurs when the player enters a room
+Solver support is used by WMR when incremental placement cannot preserve all
+required constraints directly.
 
-When a room is discovered:
+Responsibilities:
 
-    room → discovered
-    exits → revealed
+- validate constraint sets
+- compute rebuild results
+- support recovery from placement conflicts
 
-There are **no hidden exits** in the world design.
+The solver is not a UI subsystem and not a top-level runtime stage.
+It is a support component used by WMR.
 
-------------------------------------------------------------------------
+---
 
-# Spatial Layout Model
+## Runtime Pipeline
 
-The map is a **readable projection**, not a rigid geometric model.
+Primary runtime flow:
 
-Constraints use **ordered alignment rules**.
+**WCS → WEG → WNE → WMR**
 
-Examples:
+Rendering occurs inside WCS using the WMP panel.
 
--   Rooms may remain on the same row with gaps between them.
--   Rooms may remain on the same column with gaps between them.
--   Relative direction is preserved.
+Interpretation of the flow:
 
-Example valid vertical relationships:
+1. **WCS** receives input and displays output
+2. **WEG** parses raw game text into normalized events
+3. **WNE** updates navigation/discovery state
+4. **WMR** updates spatial map layout
+5. **WMP** renders the resulting map for display inside WCS
 
-    A
-    .
-    B
+This preserves a clean split between UI, parsing, navigation, and mapping.
 
-Example valid horizontal relationships:
+---
 
-    A ... B
+## Development Modes
 
-Rules:
+## Local Mode
 
--   ordering must remain correct
--   gaps are allowed
--   rooms cannot be inserted between locked pairs
+Local simulation environment used during development.
 
-------------------------------------------------------------------------
+Characteristics:
 
-# Layout Rebuild Strategy
+- world loaded from local room files
+- simulated MUD output generated locally
+- supports local navigation/testing without live telnet
 
-When a new discovery creates a layout conflict:
+Primary implementation files:
 
-1.  Attempt local adjustments
-2.  If conflict remains, rebuild layout from discovered topology
-3.  Preserve ordering constraints during rebuild
+- `wmr/local_mode.go`
+- `wmr/local_mud_output.go`
 
-The rebuild uses the **discovered subgraph only**.
+---
 
-Undiscovered world topology is not used for layout.
+## Live Mode
 
-------------------------------------------------------------------------
+Real MUD connection via telnet.
 
-# Architectural Principles
+Planned integration library:
 
-WayFinder follows strict separation of responsibilities.
+- `github.com/reiver/go-telnet`
 
--   Networking is isolated from navigation logic
--   Parsing is isolated from navigation logic
--   Navigation logic contains no UI code
--   Rendering contains no navigation logic
--   UI contains no mapping logic
+Live mode should preserve the same architectural split:
+WCS handles UI, WEG parses text, WNE manages navigation state, and WMR manages
+map layout.
 
-This separation keeps the system maintainable and safe to evolve.
+---
 
-------------------------------------------------------------------------
+## Architectural Guardrails
 
-# Future Expansion
+These rules define the intended structure of the system:
 
-Possible future components:
+1. Keep **WCS** as the UI shell.
+2. Keep **WMP** as a rendering panel inside WCS.
+3. Keep **WEG** as the parsing/event-normalization layer.
+4. Keep **WNE** as the navigation/discovery authority.
+5. Keep **WMR** as the mapping/layout authority.
+6. Keep solver logic as WMR support, not as a UI or pipeline stage.
+7. Do not merge rendering into WMR.
+8. Do not move navigation state into WCS or WMP.
+9. Do not introduce alternate architectural layers unless explicitly requested.
 
--   persistent map storage
--   multiple render styles
--   zoomable graphical maps
--   trigger/automation systems
+---
 
-The current architecture supports these without modifying the navigation
-core.
+## Current Status Snapshot
 
-------------------------------------------------------------------------
-
-# Architectural Invariants
-
-The following rules are core design principles of WayFinder. They are
-intended to prevent architectural drift as the system evolves.
-
-## Map Ownership Rule
-
-Only **WMR (WayFinder Mapping Runtime)** owns the map.
-
-WMR is responsible for:
-
--   discovered rooms
--   room placement
--   spatial layout
--   constraint enforcement
--   rebuild logic
-
-Other subsystems do **not** modify map state directly.
-
-> Only WMR owns the map. Everyone else observes or feeds it events.
-
-------------------------------------------------------------------------
-
-## Parser Isolation Rule
-
-The Event Gateway (WEG) parses raw MUD text but does not interpret map
-logic.
-
-Responsibilities of WEG:
-
--   Convert text to structured events
--   Detect room text and exits
--   Emit navigation events
-
-WEG does **not** update discovery state or modify map layout.
-
-------------------------------------------------------------------------
-
-## Navigation Interpretation Rule
-
-The Navigation Engine (WNE) interprets events but does not compute map
-layout.
-
-Responsibilities of WNE:
-
--   Maintain player movement session
--   Determine when a room is entered
--   Pass discovery and movement events to WMR
-
-WNE does not manipulate spatial layout or placement rules.
-
-------------------------------------------------------------------------
-
-## Rendering Is Read‑Only
-
-Rendering components never create map state.
-
-WMP and rendering logic:
-
--   read map state from WMR
--   convert it to a visual model
--   display the result
-
-Renderers do not maintain their own copy of map topology.
-
-------------------------------------------------------------------------
-
-## Single Source of Truth
-
-WayFinder maintains a single authoritative source for each category of
-data.
-
-Ownership:
-
--   Map state → **WMR**
--   Movement session → **WNE**
--   Parsed events → **WEG**
--   UI display → **WCS / WMP**
-
-Maintaining clear ownership boundaries keeps refactoring safe and
-prevents state inconsistencies.
+Current state at a high level:
+
+- mapping runtime implemented
+- solver implemented
+- navigation session implemented
+- local development harness implemented
+- telnet integration not yet complete
+- WEG parser not yet complete
+- WCS event wiring not yet complete
+- WMP map rendering not yet complete
+
+This architecture document describes the intended structure that current and
+future work should follow.

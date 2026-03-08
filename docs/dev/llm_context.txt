@@ -1,180 +1,63 @@
-WAYFINDER LLM DEVELOPMENT CONTEXT
+WAYFINDER LLM CONTEXT
 
-WayFinder is a MUD client with an integrated navigation system designed
-for a specific known world.
+This file provides architectural guidance for AI coding assistants.
 
-The system builds a readable spatial map of rooms as the player explores.
+------------------------------------------------
+ARCHITECTURE OVERVIEW
 
-Important distinction:
+WCS — WayFinder Client Shell
+Win32 application shell responsible for:
 
-World topology and discovery state are authoritative.
-The grid layout is a rebuildable projection.
+- window creation
+- input capture
+- displaying MUD output
+- hosting UI panels (including the map panel)
 
-The projection may change over time to maintain readability.
-
---------------------------------------------------
-
-ARCHITECTURE
-
-WayFinder consists of five components:
-
-WayFinder Client Shell (WCS)
-WayFinder Event Gateway (WEG)
-WayFinder Navigation Engine (WNE)
-WayFinder Map Renderer (WMR)
-WayFinder Map Panel (WMP)
-
-Data flow:
-
-WCS → WEG → WNE → WMR → WMP
+WMP — WayFinder Map Panel
+UI component hosted inside WCS.
 
 Responsibilities:
+- render the map produced by WMR
+- display the player location
+- display discovered rooms
 
-WCS
-Host application.
+Important:
+WMP contains NO navigation or topology logic.
 
-Responsibilities:
+------------------------------------------------
+RUNTIME PIPELINE
 
-- Telnet transport using github.com/reiver/go-telnet
-- UI using the Fyne GUI toolkit
-- command input
-- MUD output display
-- event routing
+The runtime flow is:
 
-WCS contains no navigation logic.
+WCS → WEG → WNE → WMR
 
-WEG
-Parses MUD output and converts it into navigation events.
+WMP is not part of the runtime pipeline.
 
-Example events:
+------------------------------------------------
+COMPONENT RESPONSIBILITIES
 
-EnterRoom(roomID)
-ExitsSeen(roomID, exits)
+WEG — WayFinder Event Gateway
+- parses MUD text
+- emits normalized events
 
-WEG contains no mapping logic.
+WNE — WayFinder Navigation Engine
+- maintains navigation session
+- tracks discovered topology
+- exposes movement operations
 
-WNE
-Core navigation engine.
+WMR — WayFinder Mapping Runtime
+- owns the map model
+- performs incremental room placement
+- maintains spatial constraints
+- triggers solver rebuilds when necessary
 
-Responsibilities:
+------------------------------------------------
+DESIGN PRINCIPLES
 
-- track discovered rooms
-- maintain spatial projection
-- enforce layout constraints
-- rebuild layout when conflicts occur
+1. UI must remain thin.
+2. Navigation logic must live in WNE.
+3. Map logic must live in WMR.
+4. Rendering must stay inside WCS/WMP.
+5. Solver remains independent.
 
-WNE contains no UI logic.
-
-WMR
-Converts navigation state into renderable structures.
-
-WMP
-Displays the map in the UI.
-
---------------------------------------------------
-
-DISCOVERY MODEL
-
-WayFinder maps only the discovered portion of the world.
-
-Rules:
-
-A room becomes discovered when the player enters it.
-
-If a room is discovered, all of its exits are revealed.
-
-There are no hidden exits in the world design.
-
-Undiscovered rooms are not placed on the map.
-
---------------------------------------------------
-
-SPATIAL MODEL
-
-WayFinder does NOT use rigid adjacency.
-
-Instead it uses ordered directional constraints.
-
-Examples of valid relationships:
-
-Vertical ordering:
-
-A
-.
-B
-
-Horizontal ordering:
-
-A ... B
-
-Rules:
-
-Directional ordering must be preserved.
-
-Spacing gaps are allowed.
-
-No room may appear between locked ordered pairs on the same axis.
-
---------------------------------------------------
-
-LAYOUT STRATEGY
-
-When a new room is discovered:
-
-1. Attempt incremental placement.
-
-2. If constraints remain valid, keep the layout.
-
-3. If constraints are violated, rebuild the layout
-   from the discovered subgraph.
-
-The projection may change during rebuild.
-This is expected behavior.
-
---------------------------------------------------
-
-ENGINE INVARIANTS
-
-World topology is immutable.
-
-Discovery state grows monotonically.
-
-The layout projection may change.
-
-Mapping logic must never depend on UI.
-
-Mapping logic must never depend on telnet transport.
-
---------------------------------------------------
-
-DEVELOPMENT ENVIRONMENT
-
-The current console application is a deterministic
-testing harness for the navigation engine.
-
-Movement commands simulate player navigation.
-
-The harness allows developers to verify that the
-navigation engine maintains correct spatial relationships.
-
-Future versions will integrate the engine into
-a full telnet client with a graphical UI.
-
---------------------------------------------------
-
-DEVELOPER ARTIFACTS
-
-Canonical task tracker:
-docs/dev/ToDo.md
-
-Canonical Go source inventory:
-docs/dev/go_source_index.md
-
-Regeneration instructions:
-docs/dev/MAINTENANCE.md
-
-Go source index generator:
-docs/dev/scripts/generate_go_source_index.go
-
-The source inventory is generated via Go AST and includes
-package-level types, functions/methods, and variables.
+------------------------------------------------
