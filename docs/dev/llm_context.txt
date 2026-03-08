@@ -159,3 +159,22 @@ navigation engine maintains correct spatial relationships.
 
 Future versions will integrate the engine into
 a full telnet client with a graphical UI.
+
+--------------------------------------------------
+
+DEVELOPER ARTIFACTS
+
+Canonical task tracker:
+docs/dev/ToDo.md
+
+Canonical Go source inventory:
+docs/dev/go_source_index.md
+
+Regeneration instructions:
+docs/dev/MAINTENANCE.md
+
+Go source index generator:
+docs/dev/scripts/generate_go_source_index.go
+
+The source inventory is generated via Go AST and includes
+package-level types, functions/methods, and variables.

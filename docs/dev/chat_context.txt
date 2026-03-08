@@ -255,6 +255,7 @@ Canonical task tracker: docs/dev/ToDo.md
 Canonical Go source inventory: docs/dev/go_source_index.md
 Refresh rule: regenerate `docs/dev/go_source_index.md` after any Go file add/remove/rename or major signature changes.
 Regeneration steps for `go_source_index.md`: docs/dev/MAINTENANCE.md
+Generator implementation: docs/dev/scripts/generate_go_source_index.go (AST-based; includes package-level variables).
 
 ------------------------------------------------
 CURRENT STATUS SUMMARY
