@@ -33,6 +33,7 @@ WayFinder/
 │   └── win32/
 │       ├── proc_windows.go
 │       └── shell_windows.go
+├── weg/
 ├── wmr/
 │   ├── local_mode.go
 │   ├── local_mud_output.go
@@ -41,6 +42,7 @@ WayFinder/
 ├── wne/
 │   ├── navigation_session.go
 │   └── navigation_session_test.go
+├── wtl/
 ├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md
