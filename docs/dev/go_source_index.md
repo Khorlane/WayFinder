@@ -2,6 +2,59 @@
 
 Generated from current `.go` files using Go AST (`go/parser`, `go/ast`, `go/token`). Use this as a quick technical map for chat/session continuity.
 
+## Repository Tree (Rooms summarized)
+
+```text
+WayFinder/
+├── docs/
+│   ├── autoMapper/
+│   │   ├── DeveloperSpec.md
+│   │   ├── RestartPrompt.md
+│   │   └── Summary.md
+│   ├── dev/
+│   │   ├── scripts/
+│   │   │   └── generate_go_source_index.go
+│   │   ├── chat_context.txt
+│   │   ├── go_source_index.md
+│   │   ├── llm_context.txt
+│   │   ├── MAINTENANCE.md
+│   │   ├── MudOutput.txt
+│   │   └── ToDo.md
+│   ├── architecture.md
+│   ├── discovery_model.md
+│   └── mapper_rules.md
+├── Rooms/
+│   ├── AmongstTheRocks359.txt
+│   ├── ...
+│   └── WildernessTrailJunction385.txt
+│   (465 files total)
+├── simmud/
+├── solver/
+│   └── solver.go
+├── wcs/
+│   ├── telnet/
+│   └── win32/
+│       ├── proc_windows.go
+│       └── shell_windows.go
+├── wmr/
+│   ├── local_mode.go
+│   ├── local_mud_output.go
+│   └── runtime.go
+├── wne/
+│   ├── navigation_session.go
+│   └── navigation_session_test.go
+├── .gitattributes
+├── .gitignore
+├── AGENTS.md
+├── go.mod
+├── LICENSE
+├── log.txt
+├── main.go
+├── README.md
+├── WayFinder.code-workspace
+└── WayFinder.exe
+```
+
 ## Go File Tree
 
 - `docs/dev/scripts/generate_go_source_index.go`
@@ -23,13 +76,16 @@ Types:
 
 Functions:
 - main (line 28)
-- collectGoFiles (line 53)
-- indexFile (line 78)
-- exprString (line 147)
-- sortSymbols (line 155)
-- writeIndex (line 164)
-- writeSymbols (line 187)
-- fail (line 197)
+- collectGoFiles (line 58)
+- indexFile (line 83)
+- exprString (line 152)
+- sortSymbols (line 160)
+- buildRepositoryTree (line 169)
+- buildTreeNode (line 179)
+- summarizeRoomsTree (line 236)
+- writeIndex (line 272)
+- writeSymbols (line 301)
+- fail (line 311)
 
 Variables:
 - (none)

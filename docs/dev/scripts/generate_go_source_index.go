@@ -45,7 +45,12 @@ func main() {
 		indexes = append(indexes, idx)
 	}
 
-	if err := writeIndex(filepath.Join(root, "docs", "dev", "go_source_index.md"), indexes); err != nil {
+	treeLines, err := buildRepositoryTree(root)
+	if err != nil {
+		fail(err)
+	}
+
+	if err := writeIndex(filepath.Join(root, "docs", "dev", "go_source_index.md"), treeLines, indexes); err != nil {
 		fail(err)
 	}
 }
@@ -161,11 +166,120 @@ func sortSymbols(v []symbol) {
 	})
 }
 
-func writeIndex(path string, indexes []fileIndex) error {
+func buildRepositoryTree(root string) ([]string, error) {
+	lines := []string{filepath.Base(root) + "/"}
+	more, err := buildTreeNode(root, "")
+	if err != nil {
+		return nil, err
+	}
+	lines = append(lines, more...)
+	return lines, nil
+}
+
+func buildTreeNode(dir, prefix string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := make([]os.DirEntry, 0, len(entries))
+	for _, ent := range entries {
+		if ent.Name() == ".git" {
+			continue
+		}
+		filtered = append(filtered, ent)
+	}
+
+	sort.Slice(filtered, func(i, j int) bool {
+		li, lj := filtered[i], filtered[j]
+		if li.IsDir() != lj.IsDir() {
+			return li.IsDir()
+		}
+		return strings.ToLower(li.Name()) < strings.ToLower(lj.Name())
+	})
+
+	var lines []string
+	for i, ent := range filtered {
+		isLast := i == len(filtered)-1
+		branch := "├── "
+		nextPrefix := prefix + "│   "
+		if isLast {
+			branch = "└── "
+			nextPrefix = prefix + "    "
+		}
+
+		name := ent.Name()
+		fullPath := filepath.Join(dir, name)
+		if ent.IsDir() {
+			lines = append(lines, prefix+branch+name+"/")
+			if name == "Rooms" {
+				summary, err := summarizeRoomsTree(fullPath, nextPrefix)
+				if err != nil {
+					return nil, err
+				}
+				lines = append(lines, summary...)
+				continue
+			}
+			child, err := buildTreeNode(fullPath, nextPrefix)
+			if err != nil {
+				return nil, err
+			}
+			lines = append(lines, child...)
+			continue
+		}
+		lines = append(lines, prefix+branch+name)
+	}
+
+	return lines, nil
+}
+
+func summarizeRoomsTree(roomsPath, prefix string) ([]string, error) {
+	entries, err := os.ReadDir(roomsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]string, 0, len(entries))
+	for _, ent := range entries {
+		if ent.IsDir() {
+			continue
+		}
+		files = append(files, ent.Name())
+	}
+	sort.Slice(files, func(i, j int) bool { return strings.ToLower(files[i]) < strings.ToLower(files[j]) })
+
+	switch len(files) {
+	case 0:
+		return []string{
+			prefix + "└── (no files)",
+			prefix + fmt.Sprintf("(%d files total)", len(files)),
+		}, nil
+	case 1:
+		return []string{
+			prefix + "├── " + files[0],
+			prefix + fmt.Sprintf("(%d files total)", len(files)),
+		}, nil
+	default:
+		return []string{
+			prefix + "├── " + files[0],
+			prefix + "├── ...",
+			prefix + "└── " + files[len(files)-1],
+			prefix + fmt.Sprintf("(%d files total)", len(files)),
+		}, nil
+	}
+}
+
+func writeIndex(path string, treeLines []string, indexes []fileIndex) error {
 	var b strings.Builder
 	b.WriteString("# Go Source Index\n\n")
 	b.WriteString("Generated from current `.go` files using Go AST (`go/parser`, `go/ast`, `go/token`). ")
 	b.WriteString("Use this as a quick technical map for chat/session continuity.\n\n")
+	b.WriteString("## Repository Tree (Rooms summarized)\n\n")
+	b.WriteString("```text\n")
+	for _, line := range treeLines {
+		b.WriteString(line + "\n")
+	}
+	b.WriteString("```\n\n")
 	b.WriteString("## Go File Tree\n\n")
 	for _, idx := range indexes {
 		b.WriteString("- `" + idx.Path + "`\n")
