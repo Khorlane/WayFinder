@@ -7,7 +7,7 @@
 // docs/mapper_rules.md
 // docs/discovery_model.md
 
-package harness
+package wmr
 
 import (
 	"bufio"
@@ -21,7 +21,8 @@ import (
 	"strings"
 	"time"
 
-	wcswin32 "WayFinder/internal/wcs/win32"
+	wcswin32 "WayFinder/wcs/win32"
+	"WayFinder/wne"
 	"WayFinder/solver"
 )
 
@@ -1843,6 +1844,81 @@ func discoveredRoomIDs(discovery *DiscoveryState) []RoomID {
 	return ids
 }
 
+func toWNERoomID(id RoomID) wne.RoomID { return wne.RoomID(id) }
+func fromWNERoomID(id wne.RoomID) RoomID { return RoomID(id) }
+
+type wneTopologyAdapter struct {
+	t wne.Topology
+}
+
+func (a wneTopologyAdapter) ExitsFrom(roomID RoomID) map[string]RoomID {
+	ex := a.t.ExitsFrom(toWNERoomID(roomID))
+	out := make(map[string]RoomID, len(ex))
+	for dir, id := range ex {
+		out[dir] = fromWNERoomID(id)
+	}
+	return out
+}
+
+func (a wneTopologyAdapter) Neighbors(roomID RoomID) []RoomID {
+	neighbors := a.t.Neighbors(toWNERoomID(roomID))
+	out := make([]RoomID, 0, len(neighbors))
+	for _, id := range neighbors {
+		out = append(out, fromWNERoomID(id))
+	}
+	return out
+}
+
+func (a wneTopologyAdapter) HasRoom(roomID RoomID) bool {
+	return a.t.HasRoom(toWNERoomID(roomID))
+}
+
+type wneWorldAdapter struct {
+	w *World
+}
+
+func (a wneWorldAdapter) ExitsFrom(roomID wne.RoomID) map[string]wne.RoomID {
+	ex := a.w.ExitsFrom(fromWNERoomID(roomID))
+	out := make(map[string]wne.RoomID, len(ex))
+	for dir, id := range ex {
+		out[dir] = toWNERoomID(id)
+	}
+	return out
+}
+
+func (a wneWorldAdapter) Neighbors(roomID wne.RoomID) []wne.RoomID {
+	neighbors := a.w.Neighbors(fromWNERoomID(roomID))
+	out := make([]wne.RoomID, 0, len(neighbors))
+	for _, id := range neighbors {
+		out = append(out, toWNERoomID(id))
+	}
+	return out
+}
+
+func (a wneWorldAdapter) HasRoom(roomID wne.RoomID) bool {
+	return a.w.HasRoom(fromWNERoomID(roomID))
+}
+
+type wneMapperAdapter struct {
+	m *Mapper
+}
+
+func (a wneMapperAdapter) BindTopology(t wne.Topology) {
+	a.m.BindTopology(wneTopologyAdapter{t: t})
+}
+
+func (a wneMapperAdapter) Enter(id wne.RoomID, dirMoved string) error {
+	return a.m.Enter(fromWNERoomID(id), dirMoved)
+}
+
+type wneDiscoveryAdapter struct {
+	d *DiscoveryState
+}
+
+func (a wneDiscoveryAdapter) Discover(roomID wne.RoomID) {
+	a.d.Discover(fromWNERoomID(roomID))
+}
+
 func LoadWorld(path string) (*World, error) {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -2003,8 +2079,13 @@ func Run(args []string) int {
 	discovery := NewDiscoveryState()
 
 	// Fixed start room for the harness.
-	start := RoomID("JesseSquare8")
-	session, err := NewNavigationSession(world, mapper, discovery, start)
+	start := wne.RoomID("JesseSquare8")
+	session, err := wne.NewNavigationSession(
+		wneWorldAdapter{w: world},
+		wneMapperAdapter{m: mapper},
+		wneDiscoveryAdapter{d: discovery},
+		start,
+	)
 	if err != nil {
 		uiPrintln(err)
 		return 1
@@ -2071,11 +2152,11 @@ func Run(args []string) int {
 			}
 			uiPrintln()
 		case "map":
-			session.Mapper().PrintGrid10x10Discovered(session.Discovery())
+			mapper.PrintGrid10x10Discovered(discovery)
 		case "coords":
-			session.Mapper().PrintRoomsDiscovered(world, session.Discovery())
+			mapper.PrintRoomsDiscovered(world, discovery)
 		case "show":
-			ids := discoveredRoomIDs(session.Discovery())
+			ids := discoveredRoomIDs(discovery)
 			uiPrintln("Discovered rooms:")
 			if len(ids) == 0 {
 				uiPrintln("(none)")
@@ -2100,7 +2181,7 @@ func Run(args []string) int {
 				continue
 			}
 			// Show map after every move
-			session.Mapper().PrintGrid10x10Discovered(session.Discovery())
+			mapper.PrintGrid10x10Discovered(discovery)
 		}
 	}
 }

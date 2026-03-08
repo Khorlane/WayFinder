@@ -98,14 +98,18 @@ Project root:
 WayFinder/
 │
 ├── main.go
-├── navigation_session.go
-├── navigation_session_test.go
 │
-├── internal/
-│   └── wcs/
-│       └── win32/
-│           ├── shell_windows.go
-│           └── proc_windows.go
+├── wcs/
+│   └── win32/
+│       ├── shell_windows.go
+│       └── proc_windows.go
+│
+├── wne/
+│      navigation_session.go
+│      navigation_session_test.go
+│
+├── wmr/
+│      runtime.go
 │
 ├── solver/
 │      solver.go

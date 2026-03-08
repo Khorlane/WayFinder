@@ -5,13 +5,13 @@ Generated from current `.go` files using Go AST (`go/parser`, `go/ast`, `go/toke
 ## Go File Tree
 
 - `docs/dev/scripts/generate_go_source_index.go`
-- `internal/harness/navigation_session.go`
-- `internal/harness/navigation_session_test.go`
-- `internal/harness/runtime.go`
-- `internal/wcs/win32/proc_windows.go`
-- `internal/wcs/win32/shell_windows.go`
 - `main.go`
 - `solver/solver.go`
+- `wcs/win32/proc_windows.go`
+- `wcs/win32/shell_windows.go`
+- `wmr/runtime.go`
+- `wne/navigation_session.go`
+- `wne/navigation_session_test.go`
 
 ## `docs/dev/scripts/generate_go_source_index.go`
 
@@ -31,185 +31,6 @@ Functions:
 
 Variables:
 - (none)
-
-## `internal/harness/navigation_session.go`
-
-Types:
-- Navigator (line 6)
-- NavigationSession (line 16)
-
-Functions:
-- NewNavigationSession (line 23)
-- CurrentRoom (method on *NavigationSession) (line 49)
-- CurrentExits (method on *NavigationSession) (line 53)
-- Move (method on *NavigationSession) (line 57)
-- Mapper (method on *NavigationSession) (line 70)
-- Discovery (method on *NavigationSession) (line 74)
-
-Variables:
-- (none)
-
-## `internal/harness/navigation_session_test.go`
-
-Types:
-- (none)
-
-Functions:
-- testWorld (line 5)
-- TestNavigationSessionStartAndMove (line 15)
-- TestNavigationSessionNoExit (line 42)
-
-Variables:
-- (none)
-
-## `internal/harness/runtime.go`
-
-Types:
-- RoomID (line 28)
-- Room (line 30)
-- Mapper (line 36)
-- lockedAdjKey (line 46)
-- ConstraintRelation (line 52)
-- ConstraintSet (line 63)
-- lockedAdjViolationError (line 145)
-- collisionError (line 156)
-- roomSnapshot (line 168)
-- mapperSnapshot (line 174)
-- plannedMove (line 1010)
-- Topology (line 1761)
-- World (line 1767)
-- DiscoveryState (line 1805)
-
-Functions:
-- relationForKey (line 68)
-- BuildConstraintSet (method on *Mapper) (line 86)
-- Error (method on *lockedAdjViolationError) (line 151)
-- Error (method on *collisionError) (line 163)
-- uiPrint (line 182)
-- uiPrintf (line 186)
-- uiPrintln (line 190)
-- setupLogging (line 194)
-- NewMapper (line 209)
-- BindTopology (method on *Mapper) (line 220)
-- SetDebugWriter (method on *Mapper) (line 224)
-- SetSolverProvider (method on *Mapper) (line 232)
-- debugln (method on *Mapper) (line 240)
-- debugf (method on *Mapper) (line 244)
-- colName (line 248)
-- cellLabel (line 250)
-- normalizeDirName (line 263)
-- dirDelta (line 289)
-- getRoom (method on *Mapper) (line 314)
-- clearOcc (method on *Mapper) (line 323)
-- setOcc (method on *Mapper) (line 331)
-- edgeAlignedAndOrdered (line 352)
-- roomBetweenAxis (line 375)
-- noRoomBetweenAxis (method on *Mapper) (line 393)
-- refreshLockedAdjacencies (method on *Mapper) (line 413)
-- validateLockedAdjacencies (method on *Mapper) (line 444)
-- validateConstraintSet (method on *Mapper) (line 448)
-- solverContext (method on *Mapper) (line 468)
-- solver (method on *Mapper) (line 496)
-- toSolverConstraintSet (method on *Mapper) (line 504)
-- shiftWhere (method on *Mapper) (line 531)
-- blockKey (line 608)
-- formatBlockRooms (line 617)
-- cloneBlock (line 626)
-- printRejection (method on *Mapper) (line 634)
-- destinationCandidateBlocks (method on *Mapper) (line 654)
-- moveDestinationWithCandidates (method on *Mapper) (line 761)
-- validateBlockMove (method on *Mapper) (line 854)
-- moveBlock (method on *Mapper) (line 923)
-- captureSnapshot (method on *Mapper) (line 940)
-- restoreSnapshot (method on *Mapper) (line 965)
-- stateSignature (method on *Mapper) (line 982)
-- holeOpenNow (method on *Mapper) (line 1000)
-- smallestBlocks (line 1017)
-- planningBlocks (line 1033)
-- blockHasID (line 1080)
-- plannerDeltas (line 1085)
-- planMakeRoomMultiStepDepth (method on *Mapper) (line 1112)
-- planMakeRoomMultiStep (method on *Mapper) (line 1259)
-- validateHoleOpens (method on *Mapper) (line 1308)
-- makeRoom (method on *Mapper) (line 1347)
-- rebuildDiscoveredLayout (method on *Mapper) (line 1483)
-- Enter (method on *Mapper) (line 1516)
-- enterIncremental (method on *Mapper) (line 1534)
-- PrintGrid10x10 (method on *Mapper) (line 1647)
-- PrintGrid10x10Discovered (method on *Mapper) (line 1651)
-- PrintRooms (method on *Mapper) (line 1713)
-- PrintRoomsDiscovered (method on *Mapper) (line 1717)
-- ExitsFrom (method on *World) (line 1772)
-- Neighbors (method on *World) (line 1784)
-- HasRoom (method on *World) (line 1797)
-- NewDiscoveryState (line 1809)
-- Discover (method on *DiscoveryState) (line 1815)
-- IsDiscovered (method on *DiscoveryState) (line 1819)
-- visibleExits (line 1827)
-- discoveredRoomIDs (line 1837)
-- LoadWorld (line 1846)
-- ensureRoom (method on *World) (line 1883)
-- addExit (method on *World) (line 1892)
-- parseRoomFileIntoWorld (line 1900)
-- Run (line 1981)
-
-Variables:
-- uiOut (line 180)
-
-## `internal/wcs/win32/proc_windows.go`
-
-Types:
-- (none)
-
-Functions:
-- (none)
-
-Variables:
-- user32 (line 6)
-- kernel32 (line 7)
-- procAdjustWindowRectEx (line 9)
-- procCreateWindowExW (line 10)
-- procDefWindowProcW (line 11)
-- procDestroyWindow (line 12)
-- procDispatchMessageW (line 13)
-- procGetClientRect (line 14)
-- procGetMessageW (line 15)
-- procLoadImageW (line 16)
-- procMoveWindow (line 17)
-- procPostQuitMessage (line 18)
-- procRegisterClassExW (line 19)
-- procShowWindow (line 20)
-- procTranslateMessage (line 21)
-- procUpdateWindow (line 22)
-- procGetModuleHandleW (line 24)
-
-## `internal/wcs/win32/shell_windows.go`
-
-Types:
-- point (line 48)
-- msg (line 53)
-- rect (line 62)
-- wndClassEx (line 69)
-
-Functions:
-- RunWCS (line 94)
-- wndProc (line 163)
-- createPanels (line 181)
-- layoutPanels (line 199)
-- moveWindow (line 241)
-- createWindowEx (line 251)
-- getModuleHandle (line 269)
-- loadSystemResource (line 277)
-- init (line 292)
-
-Variables:
-- hMainWnd (line 85)
-- hWOV (line 86)
-- hWIC (line 87)
-- hWMP (line 88)
-- hWOVLbl (line 89)
-- hWICLbl (line 90)
-- hWMPLbl (line 91)
 
 ## `main.go`
 
@@ -246,3 +67,209 @@ Functions:
 
 Variables:
 - DefaultSolverProvider (line 86)
+
+## `wcs/win32/proc_windows.go`
+
+Types:
+- (none)
+
+Functions:
+- (none)
+
+Variables:
+- user32 (line 6)
+- kernel32 (line 7)
+- procAdjustWindowRectEx (line 9)
+- procCreateWindowExW (line 10)
+- procDefWindowProcW (line 11)
+- procDestroyWindow (line 12)
+- procDispatchMessageW (line 13)
+- procGetClientRect (line 14)
+- procGetMessageW (line 15)
+- procLoadImageW (line 16)
+- procMoveWindow (line 17)
+- procPostQuitMessage (line 18)
+- procRegisterClassExW (line 19)
+- procShowWindow (line 20)
+- procTranslateMessage (line 21)
+- procUpdateWindow (line 22)
+- procGetModuleHandleW (line 24)
+
+## `wcs/win32/shell_windows.go`
+
+Types:
+- point (line 48)
+- msg (line 53)
+- rect (line 62)
+- wndClassEx (line 69)
+
+Functions:
+- RunWCS (line 94)
+- wndProc (line 163)
+- createPanels (line 181)
+- layoutPanels (line 199)
+- moveWindow (line 241)
+- createWindowEx (line 251)
+- getModuleHandle (line 269)
+- loadSystemResource (line 277)
+- init (line 292)
+
+Variables:
+- hMainWnd (line 85)
+- hWOV (line 86)
+- hWIC (line 87)
+- hWMP (line 88)
+- hWOVLbl (line 89)
+- hWICLbl (line 90)
+- hWMPLbl (line 91)
+
+## `wmr/runtime.go`
+
+Types:
+- RoomID (line 29)
+- Room (line 31)
+- Mapper (line 37)
+- lockedAdjKey (line 47)
+- ConstraintRelation (line 53)
+- ConstraintSet (line 64)
+- lockedAdjViolationError (line 146)
+- collisionError (line 157)
+- roomSnapshot (line 169)
+- mapperSnapshot (line 175)
+- plannedMove (line 1011)
+- Topology (line 1762)
+- World (line 1768)
+- DiscoveryState (line 1806)
+- wneTopologyAdapter (line 1850)
+- wneWorldAdapter (line 1876)
+- wneMapperAdapter (line 1902)
+- wneDiscoveryAdapter (line 1914)
+
+Functions:
+- relationForKey (line 69)
+- BuildConstraintSet (method on *Mapper) (line 87)
+- Error (method on *lockedAdjViolationError) (line 152)
+- Error (method on *collisionError) (line 164)
+- uiPrint (line 183)
+- uiPrintf (line 187)
+- uiPrintln (line 191)
+- setupLogging (line 195)
+- NewMapper (line 210)
+- BindTopology (method on *Mapper) (line 221)
+- SetDebugWriter (method on *Mapper) (line 225)
+- SetSolverProvider (method on *Mapper) (line 233)
+- debugln (method on *Mapper) (line 241)
+- debugf (method on *Mapper) (line 245)
+- colName (line 249)
+- cellLabel (line 251)
+- normalizeDirName (line 264)
+- dirDelta (line 290)
+- getRoom (method on *Mapper) (line 315)
+- clearOcc (method on *Mapper) (line 324)
+- setOcc (method on *Mapper) (line 332)
+- edgeAlignedAndOrdered (line 353)
+- roomBetweenAxis (line 376)
+- noRoomBetweenAxis (method on *Mapper) (line 394)
+- refreshLockedAdjacencies (method on *Mapper) (line 414)
+- validateLockedAdjacencies (method on *Mapper) (line 445)
+- validateConstraintSet (method on *Mapper) (line 449)
+- solverContext (method on *Mapper) (line 469)
+- solver (method on *Mapper) (line 497)
+- toSolverConstraintSet (method on *Mapper) (line 505)
+- shiftWhere (method on *Mapper) (line 532)
+- blockKey (line 609)
+- formatBlockRooms (line 618)
+- cloneBlock (line 627)
+- printRejection (method on *Mapper) (line 635)
+- destinationCandidateBlocks (method on *Mapper) (line 655)
+- moveDestinationWithCandidates (method on *Mapper) (line 762)
+- validateBlockMove (method on *Mapper) (line 855)
+- moveBlock (method on *Mapper) (line 924)
+- captureSnapshot (method on *Mapper) (line 941)
+- restoreSnapshot (method on *Mapper) (line 966)
+- stateSignature (method on *Mapper) (line 983)
+- holeOpenNow (method on *Mapper) (line 1001)
+- smallestBlocks (line 1018)
+- planningBlocks (line 1034)
+- blockHasID (line 1081)
+- plannerDeltas (line 1086)
+- planMakeRoomMultiStepDepth (method on *Mapper) (line 1113)
+- planMakeRoomMultiStep (method on *Mapper) (line 1260)
+- validateHoleOpens (method on *Mapper) (line 1309)
+- makeRoom (method on *Mapper) (line 1348)
+- rebuildDiscoveredLayout (method on *Mapper) (line 1484)
+- Enter (method on *Mapper) (line 1517)
+- enterIncremental (method on *Mapper) (line 1535)
+- PrintGrid10x10 (method on *Mapper) (line 1648)
+- PrintGrid10x10Discovered (method on *Mapper) (line 1652)
+- PrintRooms (method on *Mapper) (line 1714)
+- PrintRoomsDiscovered (method on *Mapper) (line 1718)
+- ExitsFrom (method on *World) (line 1773)
+- Neighbors (method on *World) (line 1785)
+- HasRoom (method on *World) (line 1798)
+- NewDiscoveryState (line 1810)
+- Discover (method on *DiscoveryState) (line 1816)
+- IsDiscovered (method on *DiscoveryState) (line 1820)
+- visibleExits (line 1828)
+- discoveredRoomIDs (line 1838)
+- toWNERoomID (line 1847)
+- fromWNERoomID (line 1848)
+- ExitsFrom (method on wneTopologyAdapter) (line 1854)
+- Neighbors (method on wneTopologyAdapter) (line 1863)
+- HasRoom (method on wneTopologyAdapter) (line 1872)
+- ExitsFrom (method on wneWorldAdapter) (line 1880)
+- Neighbors (method on wneWorldAdapter) (line 1889)
+- HasRoom (method on wneWorldAdapter) (line 1898)
+- BindTopology (method on wneMapperAdapter) (line 1906)
+- Enter (method on wneMapperAdapter) (line 1910)
+- Discover (method on wneDiscoveryAdapter) (line 1918)
+- LoadWorld (line 1922)
+- ensureRoom (method on *World) (line 1959)
+- addExit (method on *World) (line 1968)
+- parseRoomFileIntoWorld (line 1976)
+- Run (line 2057)
+
+Variables:
+- uiOut (line 181)
+
+## `wne/navigation_session.go`
+
+Types:
+- RoomID (line 5)
+- Topology (line 7)
+- World (line 13)
+- Mapper (line 18)
+- Discovery (line 23)
+- Navigator (line 28)
+- NavigationSession (line 36)
+
+Functions:
+- NewNavigationSession (line 43)
+- CurrentRoom (method on *NavigationSession) (line 74)
+- CurrentExits (method on *NavigationSession) (line 78)
+- Move (method on *NavigationSession) (line 82)
+
+Variables:
+- (none)
+
+## `wne/navigation_session_test.go`
+
+Types:
+- testWorld (line 5)
+- testMapper (line 32)
+- testDiscovery (line 46)
+
+Functions:
+- ExitsFrom (method on *testWorld) (line 9)
+- Neighbors (method on *testWorld) (line 18)
+- HasRoom (method on *testWorld) (line 27)
+- BindTopology (method on *testMapper) (line 37)
+- Enter (method on *testMapper) (line 41)
+- Discover (method on *testDiscovery) (line 50)
+- IsDiscovered (method on *testDiscovery) (line 54)
+- buildWorld (line 59)
+- TestNavigationSessionStartAndMove (line 69)
+- TestNavigationSessionNoExit (line 96)
+
+Variables:
+- (none)

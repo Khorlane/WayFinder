@@ -1,26 +1,46 @@
-package harness
+package wne
 
 import "fmt"
+
+type RoomID string
+
+type Topology interface {
+	ExitsFrom(roomID RoomID) map[string]RoomID
+	Neighbors(roomID RoomID) []RoomID
+	HasRoom(roomID RoomID) bool
+}
+
+type World interface {
+	ExitsFrom(roomID RoomID) map[string]RoomID
+	HasRoom(roomID RoomID) bool
+}
+
+type Mapper interface {
+	BindTopology(t Topology)
+	Enter(id RoomID, dirMoved string) error
+}
+
+type Discovery interface {
+	Discover(roomID RoomID)
+}
 
 // Navigator is the adapter-facing contract used by CLI/MUD frontends.
 type Navigator interface {
 	CurrentRoom() RoomID
 	CurrentExits() map[string]RoomID
 	Move(dir string) error
-	Mapper() *Mapper
-	Discovery() *DiscoveryState
 }
 
 // NavigationSession is the adapter boundary between an event source (CLI/MUD)
 // and the mapping core. It owns current room/discovery progression.
 type NavigationSession struct {
-	world     *World
-	mapper    *Mapper
-	discovery *DiscoveryState
+	world     World
+	mapper    Mapper
+	discovery Discovery
 	cur       RoomID
 }
 
-func NewNavigationSession(world *World, mapper *Mapper, discovery *DiscoveryState, start RoomID) (*NavigationSession, error) {
+func NewNavigationSession(world World, mapper Mapper, discovery Discovery, start RoomID) (*NavigationSession, error) {
 	if world == nil {
 		return nil, fmt.Errorf("world is nil")
 	}
@@ -33,7 +53,12 @@ func NewNavigationSession(world *World, mapper *Mapper, discovery *DiscoveryStat
 	if !world.HasRoom(start) {
 		return nil, fmt.Errorf("start room %s not found in world", start)
 	}
-	mapper.BindTopology(world)
+
+	topo, ok := world.(Topology)
+	if !ok {
+		return nil, fmt.Errorf("world does not satisfy topology contract")
+	}
+	mapper.BindTopology(topo)
 	if err := mapper.Enter(start, "START"); err != nil {
 		return nil, fmt.Errorf("mapper start error: %w", err)
 	}
@@ -65,12 +90,4 @@ func (s *NavigationSession) Move(dir string) error {
 	s.discovery.Discover(next)
 	s.cur = next
 	return nil
-}
-
-func (s *NavigationSession) Mapper() *Mapper {
-	return s.mapper
-}
-
-func (s *NavigationSession) Discovery() *DiscoveryState {
-	return s.discovery
 }

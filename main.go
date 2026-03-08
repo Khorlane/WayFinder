@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"WayFinder/internal/harness"
+	"WayFinder/wmr"
 )
 
 func main() {
-	os.Exit(harness.Run(os.Args))
+	os.Exit(wmr.Run(os.Args))
 }
