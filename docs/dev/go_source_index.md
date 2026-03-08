@@ -28,7 +28,6 @@ WayFinder/
 │   ├── ...
 │   └── WildernessTrailJunction385.txt
 │   (465 files total)
-├── simmud/
 ├── solver/
 │   └── solver.go
 ├── wcs/
