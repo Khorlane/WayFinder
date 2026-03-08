@@ -1,0 +1,130 @@
+
+Version 2021.11.23
+      __  __  ______  __ __   __  ______  __  __  _____  _____  _______
+     / / / / / __  / / / \ \ / / / __  / / / / / / ___/ / ___/ /__  __/
+    / /_/ / / / / / / /   \ / / / / / / / / / / / /_    \ \      / /
+   / __  / / / / / / /     / / / / / / / / / / / __/     \ \    / /
+  / / / / / /_/ / / /___  / / / /_/ / / /_/ / / /___  ___/ /   / /
+ /_/ /_/ /_____/ /_____/ /_/ /____ \ /_____/ /_____/ /____/   /_/
+                                  \_\
+Welcome to HolyQuest!
+
+Appropriate names can be found at:
+Female - https://www.kabalarians.com/cfm/top-3000-baby-names-female.cfm
+Male   - https://www.kabalarians.com/cfm/top-3000-baby-names-male.cfm
+
+
+Create a new character Y-N?
+n
+
+Name?
+ixaka
+
+Password?
+aixaka4u
+
+Message of the Day
+
+Help is a player's best friend, use it.
+
+New stuff!
+New armor set, weapon, vendors, and adventure areas!
+Fight messages have been enhanced.
+Added current vs total hit points to status display.
+Enjoy and be safe out there.
+
+Beta Test of HolyQuest is in progress
+Please report any problems to trouble@holyquest.org
+
+
+May your travels be safe.
+
+
+Jesse Square [JesseSquare8 Street ]
+  Down the hillside to the east you can see the
+Kidron Valley. To the north and west is King David's
+palace citadel. Occassionaly the sounds of the busy
+market can be heard.
+Exits: East South West
+A statue dominates the center of the square.
+(1) A lamb rubs its head on your leg looking for some affection.
+
+155H 25M > w
+
+Palace Way [PalaceWay9 Street ]
+  This broad, clean, but busy street passes before the
+palace citadel.
+Exits: East West
+
+155H 25M > w
+
+Palace Way [PalaceWay10 Street ]
+  This broad, clean, but busy street passes before the
+palace citadel. The sounds of the busy market can be
+heard clearly coming from the south.
+Exits: North East South West
+
+155H 25M > n
+
+Palace Gate [PalaceGate13 Street ]
+  To the north is palace and to the south is Palace Way.
+Exits: North South
+(1) The gate keeper stands at attention, ready to protect the city.
+
+155H 25M > n
+
+Citadel Street [CitadelStreet14 Street ]
+  Government buildings occupy both sides of the street.
+Officials from across the kingdom come here to meet with
+King David and his ministers.
+Exits: East SouthEast South West
+
+155H 25M > w
+
+Citadel Street [CitadelStreet15 Street ]
+  Government buildings occupy both sides of the street.
+Officials from across the kingdom come here to meet with
+King David and his ministers.
+Exits: North East
+
+155H 25M > n
+
+Citadel Street [CitadelStreet16 Street ]
+  Government buildings occupy both sides of the street.
+Officials from across the kingdom come here to meet with
+King David and his ministers.
+Exits: East South
+
+155H 25M > e
+
+Citadel Street [CitadelStreet384 Street ]
+  Government buildings can be seen to east and west. To the
+north is a marble stairway leading to the palace. The tent
+containing the Ark is to the south.
+Exits: North East South West
+
+155H 25M > e
+
+Citadel Street [CitadelStreet18 Street ]
+  Government buildings occupy both sides of the street.
+Officials from across the kingdom come here to meet with
+King David and his ministers.
+Exits: South West
+
+155H 25M > s
+
+Citadel Street [CitadelStreet17 Street ]
+  Government buildings occupy both sides of the street.
+Officials from across the kingdom come here to meet with
+King David and his ministers.
+Exits: North West
+
+155H 25M > w
+
+Citadel Street [CitadelStreet14 Street ]
+  Government buildings occupy both sides of the street.
+Officials from across the kingdom come here to meet with
+King David and his ministers.
+Exits: East SouthEast South West
+
+155H 25M > 
