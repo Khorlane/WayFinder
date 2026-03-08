@@ -90,6 +90,11 @@ Solver API:
 
 Mapper converts internal structures into solver structures.
 
+Recent completed refactors:
+- WF-003 completed: `main.go` reduced to bootstrap/composition entrypoint (commit: `a5f7625`)
+- WF-004 completed: moved subsystem code to top-level `wcs/`, `wne/`, `wmr/`, `solver/` layout (commit: `f616a65`)
+- WCS Win32 shell remains available from CLI via `gui` command
+
 ------------------------------------------------
 CURRENT PROJECT STRUCTURE
 
@@ -266,11 +271,15 @@ CURRENT STATUS SUMMARY
 
 Mapping engine: complete
 Solver architecture: complete
-Package separation: in progress (solver complete, WCS Win32 package added)
+Package separation: major structure complete (`wcs/`, `wne/`, `wmr/`, `solver/`)
 Telnet integration: not started
 GUI: started (Win32 WCS stub available via `gui` command)
 
-Estimated completion: ~70-75%
+Estimated completion: ~75-80%
+
+Top open TODOs:
+- WF-001 minimal runtime switch: local world navigation vs live telnet (`www.holyquest.org:7373`)
+- WF-002 remove temporary `Rooms/` folder when no longer needed
 
 Remaining work is mostly WCS/WEG integration, telnet integration, and map panel rendering.
 
