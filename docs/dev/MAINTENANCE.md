@@ -14,3 +14,7 @@ Notes:
 - Generator uses Go AST (`go/parser`, `go/ast`, `go/token`), not regex.
 - Index includes package-level `Types`, `Functions` (including methods), and `Variables`.
 - Variables are package-level only; function-local variables are intentionally excluded.
+
+## ToDo Commit Tags
+
+When completing a `WF-*` item in `docs/dev/ToDo.md`, replace `(commit: pending)` or `(commit: TBD)` with the exact commit hash in the same commit (or immediate follow-up commit).
