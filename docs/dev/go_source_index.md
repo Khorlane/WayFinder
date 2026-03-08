@@ -5,11 +5,12 @@ Generated from current `.go` files using Go AST (`go/parser`, `go/ast`, `go/toke
 ## Go File Tree
 
 - `docs/dev/scripts/generate_go_source_index.go`
+- `internal/harness/navigation_session.go`
+- `internal/harness/navigation_session_test.go`
+- `internal/harness/runtime.go`
 - `internal/wcs/win32/proc_windows.go`
 - `internal/wcs/win32/shell_windows.go`
 - `main.go`
-- `navigation_session.go`
-- `navigation_session_test.go`
 - `solver/solver.go`
 
 ## `docs/dev/scripts/generate_go_source_index.go`
@@ -31,62 +32,37 @@ Functions:
 Variables:
 - (none)
 
-## `internal/wcs/win32/proc_windows.go`
+## `internal/harness/navigation_session.go`
+
+Types:
+- Navigator (line 6)
+- NavigationSession (line 16)
+
+Functions:
+- NewNavigationSession (line 23)
+- CurrentRoom (method on *NavigationSession) (line 49)
+- CurrentExits (method on *NavigationSession) (line 53)
+- Move (method on *NavigationSession) (line 57)
+- Mapper (method on *NavigationSession) (line 70)
+- Discovery (method on *NavigationSession) (line 74)
+
+Variables:
+- (none)
+
+## `internal/harness/navigation_session_test.go`
 
 Types:
 - (none)
 
 Functions:
+- testWorld (line 5)
+- TestNavigationSessionStartAndMove (line 15)
+- TestNavigationSessionNoExit (line 42)
+
+Variables:
 - (none)
 
-Variables:
-- user32 (line 6)
-- kernel32 (line 7)
-- procAdjustWindowRectEx (line 9)
-- procCreateWindowExW (line 10)
-- procDefWindowProcW (line 11)
-- procDestroyWindow (line 12)
-- procDispatchMessageW (line 13)
-- procGetClientRect (line 14)
-- procGetMessageW (line 15)
-- procLoadImageW (line 16)
-- procMoveWindow (line 17)
-- procPostQuitMessage (line 18)
-- procRegisterClassExW (line 19)
-- procShowWindow (line 20)
-- procTranslateMessage (line 21)
-- procUpdateWindow (line 22)
-- procGetModuleHandleW (line 24)
-
-## `internal/wcs/win32/shell_windows.go`
-
-Types:
-- point (line 48)
-- msg (line 53)
-- rect (line 62)
-- wndClassEx (line 69)
-
-Functions:
-- RunWCS (line 94)
-- wndProc (line 163)
-- createPanels (line 181)
-- layoutPanels (line 199)
-- moveWindow (line 241)
-- createWindowEx (line 251)
-- getModuleHandle (line 269)
-- loadSystemResource (line 277)
-- init (line 292)
-
-Variables:
-- hMainWnd (line 85)
-- hWOV (line 86)
-- hWIC (line 87)
-- hWMP (line 88)
-- hWOVLbl (line 89)
-- hWICLbl (line 90)
-- hWMPLbl (line 91)
-
-## `main.go`
+## `internal/harness/runtime.go`
 
 Types:
 - RoomID (line 28)
@@ -175,37 +151,73 @@ Functions:
 - ensureRoom (method on *World) (line 1883)
 - addExit (method on *World) (line 1892)
 - parseRoomFileIntoWorld (line 1900)
-- main (line 1981)
+- Run (line 1981)
 
 Variables:
 - uiOut (line 180)
 
-## `navigation_session.go`
+## `internal/wcs/win32/proc_windows.go`
 
 Types:
-- Navigator (line 6)
-- NavigationSession (line 16)
+- (none)
 
 Functions:
-- NewNavigationSession (line 23)
-- CurrentRoom (method on *NavigationSession) (line 49)
-- CurrentExits (method on *NavigationSession) (line 53)
-- Move (method on *NavigationSession) (line 57)
-- Mapper (method on *NavigationSession) (line 70)
-- Discovery (method on *NavigationSession) (line 74)
+- (none)
 
 Variables:
-- (none)
+- user32 (line 6)
+- kernel32 (line 7)
+- procAdjustWindowRectEx (line 9)
+- procCreateWindowExW (line 10)
+- procDefWindowProcW (line 11)
+- procDestroyWindow (line 12)
+- procDispatchMessageW (line 13)
+- procGetClientRect (line 14)
+- procGetMessageW (line 15)
+- procLoadImageW (line 16)
+- procMoveWindow (line 17)
+- procPostQuitMessage (line 18)
+- procRegisterClassExW (line 19)
+- procShowWindow (line 20)
+- procTranslateMessage (line 21)
+- procUpdateWindow (line 22)
+- procGetModuleHandleW (line 24)
 
-## `navigation_session_test.go`
+## `internal/wcs/win32/shell_windows.go`
+
+Types:
+- point (line 48)
+- msg (line 53)
+- rect (line 62)
+- wndClassEx (line 69)
+
+Functions:
+- RunWCS (line 94)
+- wndProc (line 163)
+- createPanels (line 181)
+- layoutPanels (line 199)
+- moveWindow (line 241)
+- createWindowEx (line 251)
+- getModuleHandle (line 269)
+- loadSystemResource (line 277)
+- init (line 292)
+
+Variables:
+- hMainWnd (line 85)
+- hWOV (line 86)
+- hWIC (line 87)
+- hWMP (line 88)
+- hWOVLbl (line 89)
+- hWICLbl (line 90)
+- hWMPLbl (line 91)
+
+## `main.go`
 
 Types:
 - (none)
 
 Functions:
-- testWorld (line 5)
-- TestNavigationSessionStartAndMove (line 15)
-- TestNavigationSessionNoExit (line 42)
+- main (line 9)
 
 Variables:
 - (none)
