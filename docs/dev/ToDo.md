@@ -4,4 +4,5 @@
 - [ ] WF-002 When the temporary `Rooms/` dataset is no longer needed, remove the entire `Rooms/` folder from the project.
 - [x] WF-003 Reduce `main.go` scope by extracting mapper core, world loading, and CLI harness into focused internal packages; keep `main.go` as bootstrap/composition wiring only. (commit: a5f7625)
 - [x] WF-004 Refactor package/folder layout to architecture-aligned top-level subsystems (`wcs/`, `wne/`, `wmr/`, `solver/`) and remove temporary `internal/harness` naming. (commit: f616a65)
-- [x] WF-005 Local dev harness now emits simulated HolyQuest-style room output after room entry and movement attempts, while still showing the discovered-room map with `@` for current room. (commit: pending)
+- [x] WF-005 Local dev harness now emits simulated HolyQuest-style room output after room entry and movement attempts, while still showing the discovered-room map with `@` for current room. (commit: f616a65)
+- [ ] WF-006 Refactor `wmr/runtime.go` to isolate the local/dev harness: move `Run`, `LoadWorld`, `parseRoomFileIntoWorld`, and other local-mode helpers into `wmr/local_mode.go`, leaving `runtime.go` responsible only for mapper/runtime behavior. Simulated HolyQuest-style output in `local_mud_output.go` must remain unchanged. (commit: TBD)
