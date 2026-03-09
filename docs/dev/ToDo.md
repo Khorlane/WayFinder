@@ -9,3 +9,4 @@
 - [x] WF-007 ToDo/maintenance hygiene: corrected WF-005 commit tag and added `docs/dev/MAINTENANCE.md` guidance for updating `(commit: pending|TBD)` to exact commit hashes when closing WF items. (commit: f819d22)
 - [x] WF-008 Upgrade `docs/dev/scripts/generate_go_source_index.go` to prepend a full repository tree section to `docs/dev/go_source_index.md`, excluding full `Rooms/` expansion by showing only first and last room files (sorted) plus a summarized count. (commit: 6c2a4ce)
 - [x] WF-009 Move `solver/solver.go` to `wmr/solver.go` to reduce top-level package clutter, while preserving the `SolverEngine` interface boundary and current behavior/tests. (commit: 4ff7746)
+- [ ] WF-010 Move exit parsing ownership to WEG by extracting local room-exit parsing logic from WMR/local-mode code and routing normalized exit events through WCS → WEG → WNE → WMR.

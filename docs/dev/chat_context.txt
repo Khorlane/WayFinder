@@ -1,5 +1,6 @@
 WAYFINDER PROJECT CONTEXT
 Paste this into a new ChatGPT or Codex session to restore project context.
+Last updated: 2026-03-08 (commit: 0d0bf87)
 
 ------------------------------------------------
 PROJECT: WayFinder
@@ -65,7 +66,7 @@ WayFinder/
 │
 ├── main.go
 ├── wcs/
-│   ├── telnet/
+│   ├── telnet/   (currently empty placeholder)
 │   └── win32/
 │       ├── proc_windows.go
 │       └── shell_windows.go
@@ -94,7 +95,8 @@ WayFinder/
 Current repo notes:
 - Local dev harness lives in wmr/local_mode.go
 - Simulated MUD output lives in wmr/local_mud_output.go
-- simmud/ is a legacy cleanup artifact and is not an active subsystem
+- Solver implementation now lives at wmr/solver.go
+- Exit parsing in local mode is temporary; architectural ownership is WEG
 
 ------------------------------------------------
 CURRENT IMPLEMENTATION STATUS
@@ -105,11 +107,9 @@ Navigation session: COMPLETE
 Local development harness: COMPLETE
 
 Remaining work:
-- minimal runtime switch (local vs telnet)
-- telnet integration
-- WEG parser
-- WCS event wiring
-- WMP map rendering
+- WF-001 minimal runtime switch (local vs live telnet)
+- WF-002 remove temporary Rooms/ dataset when no longer needed
+- WF-010 move exit parsing ownership to WEG (WCS -> WEG -> WNE -> WMR)
 
 Estimated completion: ~75–80%
 
