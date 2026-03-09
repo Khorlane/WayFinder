@@ -11,6 +11,7 @@ import (
 	"time"
 
 	wcswin32 "WayFinder/wcs/win32"
+	"WayFinder/weg"
 	"WayFinder/wmr"
 	"WayFinder/wne"
 )
@@ -609,10 +610,17 @@ func Run(args []string) int {
 		uiPrintln(err)
 		return 1
 	}
+	gateway := weg.NewSimulatedGateway(
+		session,
+		mapper,
+		world,
+		discovery,
+		func() []wmr.RoomID { return discoveredRoomIDs(discovery) },
+	)
 
 	uiPrintln("Commands: n s e w ne nw se sw | look | map | coords | show | gui | quit")
 	emitSimulatedRoomOutput(worldPath, wmr.RoomID(session.CurrentRoom()), toRoomIDExits(session.CurrentExits()))
-	mapper.PrintGrid10x10Discovered(discovery)
+	gateway.PrintMap()
 
 	in := bufio.NewReader(os.Stdin)
 	for {
@@ -624,54 +632,48 @@ func Run(args []string) int {
 			continue
 		}
 
-		switch line {
-		case "quit", "exit":
+		result := gateway.IngestRawText("SIMCMD " + line)
+		switch result.Kind {
+		case weg.KindQuit:
 			uiPrintln()
 			return 0
-		case "gui":
+		case weg.KindGUI:
 			uiPrintln()
 			wcswin32.RunWCS()
-		case "look":
+		case weg.KindLook:
 			uiPrintln()
-			emitSimulatedRoomOutput(worldPath, wmr.RoomID(session.CurrentRoom()), toRoomIDExits(session.CurrentExits()))
-			mapper.PrintGrid10x10Discovered(discovery)
-		case "map":
+			emitSimulatedRoomOutput(worldPath, result.CurrentRoom, result.CurrentExits)
+			gateway.PrintMap()
+		case weg.KindMap:
 			uiPrintln()
-			mapper.PrintGrid10x10Discovered(discovery)
-		case "coords":
+			gateway.PrintMap()
+		case weg.KindCoords:
 			uiPrintln()
-			mapper.PrintRoomsDiscovered(world, discovery)
-		case "show":
+			gateway.PrintCoords()
+		case weg.KindShow:
 			uiPrintln()
-			ids := discoveredRoomIDs(discovery)
 			uiPrintln("Discovered rooms:")
-			if len(ids) == 0 {
+			if len(result.Discovered) == 0 {
 				uiPrintln("(none)")
 				break
 			}
-			for _, id := range ids {
+			for _, id := range result.Discovered {
 				uiPrintln(string(id))
 			}
-		default:
-			dir := normalizeDirName(line)
-			if dir == "" {
-				uiPrintln()
-				emitSimulatedSystemText("Huh?")
-				continue
-			}
-			if err := session.Move(dir); err != nil {
-				if err.Error() == "no exit that way" {
-					uiPrintln()
-					emitSimulatedMoveFailure(dir)
-					continue
-				}
-				uiPrintln()
-				emitSimulatedSystemText(fmt.Sprintf("System: %v", err))
-				continue
-			}
+		case weg.KindMoveFail:
 			uiPrintln()
-			emitSimulatedRoomOutput(worldPath, wmr.RoomID(session.CurrentRoom()), toRoomIDExits(session.CurrentExits()))
-			mapper.PrintGrid10x10Discovered(discovery)
+			if result.MoveErr != nil && result.MoveErr.Error() == "no exit that way" {
+				emitSimulatedMoveFailure(result.Direction)
+				continue
+			}
+			emitSimulatedSystemText(fmt.Sprintf("System: %v", result.MoveErr))
+		case weg.KindMoveOK:
+			uiPrintln()
+			emitSimulatedRoomOutput(worldPath, result.CurrentRoom, result.CurrentExits)
+			gateway.PrintMap()
+		default:
+			uiPrintln()
+			emitSimulatedSystemText("Huh?")
 		}
 	}
 }

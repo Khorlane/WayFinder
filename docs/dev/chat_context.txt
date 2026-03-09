@@ -70,6 +70,8 @@ WayFinder/
 │   └── win32/
 │       ├── proc_windows.go
 │       └── shell_windows.go
+├── weg/
+│   └── simulated_gateway.go
 ├── wmr/
 │   ├── dev_view.go
 │   ├── runtime.go
@@ -96,6 +98,7 @@ WayFinder/
 Current repo notes:
 - Local dev harness now lives in wtl/simulated_mode.go
 - Simulated MUD output generation now lives in wtl/simulated_mode.go
+- Simulated command text is first interpreted by WEG at weg/simulated_gateway.go before WNE movement
 - Solver implementation now lives at wmr/solver.go
 - Simulator room-file parsing in WTL is temporary harness logic; architectural text parsing ownership is WEG
 

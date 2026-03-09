@@ -34,6 +34,7 @@ WayFinder/
 │       ├── proc_windows.go
 │       └── shell_windows.go
 ├── weg/
+│   └── simulated_gateway.go
 ├── wmr/
 │   ├── dev_view.go
 │   ├── runtime.go
@@ -55,7 +56,8 @@ WayFinder/
 ├── WayFinder.exe
 ├── WayFinder_refactor_step1_codex_instructions.md
 ├── WayFinder_refactor_step1_docs_task.md
-└── WayFinder_refactor_step2_codex_instructions.md
+├── WayFinder_refactor_step2_codex_instructions.md
+└── WayFinder_refactor_step3_codex_instructions.md
 ```
 
 ## Go File Tree
@@ -64,6 +66,7 @@ WayFinder/
 - `main.go`
 - `wcs/win32/proc_windows.go`
 - `wcs/win32/shell_windows.go`
+- `weg/simulated_gateway.go`
 - `wmr/dev_view.go`
 - `wmr/runtime.go`
 - `wmr/solver.go`
@@ -158,6 +161,26 @@ Variables:
 - hWOVLbl (line 89)
 - hWICLbl (line 90)
 - hWMPLbl (line 91)
+
+## `weg/simulated_gateway.go`
+
+Types:
+- discoveredView (line 22)
+- worldView (line 26)
+- Result (line 30)
+- SimulatedGateway (line 39)
+
+Functions:
+- NewSimulatedGateway (line 47)
+- IngestRawText (method on *SimulatedGateway) (line 57)
+- PrintMap (method on *SimulatedGateway) (line 98)
+- PrintCoords (method on *SimulatedGateway) (line 102)
+- snapshot (method on *SimulatedGateway) (line 106)
+- normalizeDirName (line 115)
+- toRoomIDExits (line 139)
+
+Variables:
+- (none)
 
 ## `wmr/dev_view.go`
 
@@ -321,54 +344,54 @@ Variables:
 ## `wtl/simulated_mode.go`
 
 Types:
-- World (line 57)
-- DiscoveryState (line 112)
-- wneTopologyAdapter (line 146)
-- wneWorldAdapter (line 172)
-- wneMapperAdapter (line 198)
-- wneDiscoveryAdapter (line 210)
-- localRoomPresentation (line 335)
+- World (line 58)
+- DiscoveryState (line 113)
+- wneTopologyAdapter (line 147)
+- wneWorldAdapter (line 173)
+- wneMapperAdapter (line 199)
+- wneDiscoveryAdapter (line 211)
+- localRoomPresentation (line 336)
 
 Functions:
-- uiPrint (line 27)
-- uiPrintf (line 31)
-- uiPrintln (line 35)
-- setupLogging (line 39)
-- ExitsFrom (method on *World) (line 62)
-- Neighbors (method on *World) (line 74)
-- HasRoom (method on *World) (line 87)
-- ensureRoom (method on *World) (line 95)
-- addExit (method on *World) (line 104)
-- NewDiscoveryState (line 116)
-- Discover (method on *DiscoveryState) (line 122)
-- IsDiscovered (method on *DiscoveryState) (line 126)
-- discoveredRoomIDs (line 134)
-- toWNERoomID (line 143)
-- fromWNERoomID (line 144)
-- ExitsFrom (method on wneTopologyAdapter) (line 150)
-- Neighbors (method on wneTopologyAdapter) (line 159)
-- HasRoom (method on wneTopologyAdapter) (line 168)
-- ExitsFrom (method on wneWorldAdapter) (line 176)
-- Neighbors (method on wneWorldAdapter) (line 185)
-- HasRoom (method on wneWorldAdapter) (line 194)
-- BindTopology (method on wneMapperAdapter) (line 202)
-- Enter (method on wneMapperAdapter) (line 206)
-- Discover (method on wneDiscoveryAdapter) (line 214)
-- LoadWorld (line 218)
-- parseRoomFileIntoWorld (line 255)
-- emitLocalPrompt (line 342)
-- emitSimulatedRoomOutput (line 346)
-- emitSimulatedMoveFailure (line 363)
-- emitSimulatedSystemText (line 374)
-- loadLocalRoomPresentation (line 380)
-- normalizeDescription (line 431)
-- wrapDescriptionLines (line 446)
-- formatSimulatedExits (line 469)
-- exitSortRank (line 494)
-- formatExitDisplayName (line 517)
-- toRoomIDExits (line 544)
-- normalizeDirName (line 552)
-- Run (line 577)
+- uiPrint (line 28)
+- uiPrintf (line 32)
+- uiPrintln (line 36)
+- setupLogging (line 40)
+- ExitsFrom (method on *World) (line 63)
+- Neighbors (method on *World) (line 75)
+- HasRoom (method on *World) (line 88)
+- ensureRoom (method on *World) (line 96)
+- addExit (method on *World) (line 105)
+- NewDiscoveryState (line 117)
+- Discover (method on *DiscoveryState) (line 123)
+- IsDiscovered (method on *DiscoveryState) (line 127)
+- discoveredRoomIDs (line 135)
+- toWNERoomID (line 144)
+- fromWNERoomID (line 145)
+- ExitsFrom (method on wneTopologyAdapter) (line 151)
+- Neighbors (method on wneTopologyAdapter) (line 160)
+- HasRoom (method on wneTopologyAdapter) (line 169)
+- ExitsFrom (method on wneWorldAdapter) (line 177)
+- Neighbors (method on wneWorldAdapter) (line 186)
+- HasRoom (method on wneWorldAdapter) (line 195)
+- BindTopology (method on wneMapperAdapter) (line 203)
+- Enter (method on wneMapperAdapter) (line 207)
+- Discover (method on wneDiscoveryAdapter) (line 215)
+- LoadWorld (line 219)
+- parseRoomFileIntoWorld (line 256)
+- emitLocalPrompt (line 343)
+- emitSimulatedRoomOutput (line 347)
+- emitSimulatedMoveFailure (line 364)
+- emitSimulatedSystemText (line 375)
+- loadLocalRoomPresentation (line 381)
+- normalizeDescription (line 432)
+- wrapDescriptionLines (line 447)
+- formatSimulatedExits (line 470)
+- exitSortRank (line 495)
+- formatExitDisplayName (line 518)
+- toRoomIDExits (line 545)
+- normalizeDirName (line 553)
+- Run (line 578)
 
 Variables:
-- uiOut (line 25)
+- uiOut (line 26)
