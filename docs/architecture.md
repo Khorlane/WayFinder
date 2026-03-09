@@ -155,7 +155,7 @@ It is a support component used by WMR.
 
 Primary runtime flow:
 
-**WCS → WEG → WNE → WMR**
+**WTL → WEG → WNE → WMR → WCS**
 
 Rendering occurs inside WCS using the WMP panel.
 
@@ -166,10 +166,6 @@ Interpretation of the flow:
 3. **WNE** updates navigation/discovery state
 4. **WMR** updates spatial map layout
 5. **WCS** displays output and renders the map using WMP
-2. **WEG** parses raw game text into normalized events
-3. **WNE** updates navigation/discovery state
-4. **WMR** updates spatial map layout
-5. **WMP** renders the resulting map for display inside WCS
 
 This preserves a clean split between UI, parsing, navigation, and mapping.
 

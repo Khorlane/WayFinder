@@ -109,7 +109,7 @@ Local development harness: COMPLETE
 Remaining work:
 - WF-001 minimal runtime switch (local vs live telnet)
 - WF-002 remove temporary Rooms/ dataset when no longer needed
-- WF-010 move exit parsing ownership to WEG (WCS -> WEG -> WNE -> WMR)
+- WF-010 isolate MUD input boundary: WTL as inbound text source (WTL -> WEG -> WNE -> WMR -> WCS)
 
 Estimated completion: ~75–80%
 
