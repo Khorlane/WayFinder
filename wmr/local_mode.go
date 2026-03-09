@@ -332,6 +332,9 @@ func (w *World) addExit(from RoomID, dir string, to RoomID) {
 	w.neighbors[to][from] = struct{}{}
 }
 
+// parseRoomFileIntoWorld is local simulated-mode harness parsing only.
+// In the target runtime architecture, raw inbound MUD text parsing belongs to
+// WEG after WTL provides the text stream.
 func parseRoomFileIntoWorld(w *World, filePath string) error {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -413,6 +416,9 @@ func parseRoomFileIntoWorld(w *World, filePath string) error {
 	return nil
 }
 
+// Run executes the local simulated development harness.
+// This path is non-authoritative and exists to exercise WNE/WMR behavior until
+// WTL live mode is wired as the primary inbound text source.
 func Run(args []string) int {
 	cleanupLog, logErr := setupLogging("log.txt")
 	if logErr != nil {

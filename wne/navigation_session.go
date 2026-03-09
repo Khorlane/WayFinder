@@ -33,6 +33,8 @@ type Navigator interface {
 
 // NavigationSession is the adapter boundary between an event source (CLI/MUD)
 // and the mapping core. It owns current room/discovery progression.
+// WNE maintains discovered navigation topology and consumes already-parsed
+// movement intent/events from upstream layers (for example WEG).
 type NavigationSession struct {
 	world     World
 	mapper    Mapper

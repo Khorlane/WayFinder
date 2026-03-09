@@ -91,6 +91,9 @@ var (
 	hWMPLbl  uintptr
 )
 
+// RunWCS starts the Client Shell UI host.
+// WCS handles presentation and command capture; it does not own navigation,
+// topology, or map projection rules.
 func RunWCS() {
 	hInstance := getModuleHandle()
 	classNamePtr := syscall.StringToUTF16Ptr(className)

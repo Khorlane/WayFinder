@@ -18,6 +18,9 @@ const (
 	descWrapWidth     = 72
 )
 
+// Simulated MUD output is a development harness feed.
+// It emulates the inbound text source until WTL live mode becomes the primary
+// runtime text source.
 type localRoomPresentation struct {
 	Title       string
 	AreaName    string

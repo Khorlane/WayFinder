@@ -20,6 +20,9 @@ import (
 	"time"
 )
 
+// WMR owns spatial projection/layout for discovered topology.
+// WMR does not parse raw MUD text (WEG responsibility) and does not render UI
+// (WCS/WMP responsibility).
 type RoomID string
 
 type Room struct {
