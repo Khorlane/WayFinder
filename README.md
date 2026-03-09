@@ -33,17 +33,18 @@ WNE[WayFinder Navigation Engine]
 WMR[WayFinder Map Renderer]
 WMP[WayFinder Map Panel]
 
-MUD --> WCS
-WCS --> WEG
+MUD --> WTL
+WTL --> WEG
 WEG --> WNE
 WNE --> WMR
-WMR --> WMP
+WMR --> WCS
+WCS --> WMP
 ```
 
 Pipeline shorthand:
 
 ```
-WCS → WEG → WNE → WMR → WMP
+WTL → WEG → WNE → WMR → WCS
 ```
 
 ---
@@ -72,11 +73,11 @@ WF --> WMP
 
 | Component | Responsibility |
 |---|---|
-| **WCS** | Telnet transport, command input, UI shell |
-| **WEG** | Convert MUD text into navigation events |
-| **WNE** | Discovery tracking and spatial layout engine |
-| **WMR** | Convert navigation state into renderable map data |
-| **WMP** | Display the map in the UI |
+| **WTL** | Raw text transport source |
+| **WEG** | Convert raw MUD text into structured WayFinder events |
+| **WNE** | Maintain the player’s discovered navigation state |
+| **WMR** | Project WNE’s discovered topology into map layout/state |
+| **WCS** | User-facing shell and orchestration surface |
 
 ---
 
@@ -164,13 +165,13 @@ Constraints:
 # Repository Structure
 
 ```
-cmd/wayfinder        application entry point
+main.go              application entry point
 
-internal/shell       WayFinder Client Shell
-internal/gateway     WayFinder Event Gateway
-internal/navigation  WayFinder Navigation Engine
-internal/renderer    WayFinder Map Renderer
-internal/panel       WayFinder Map Panel
+wcs  WayFinder Client Shell
+weg  WayFinder Event Gateway
+wne  WayFinder Navigation Engine
+wmr  WayFinder Mapping Runtime
+wtl  WayFinder Telnet Layer
 
 docs/                detailed architecture documentation
 ```
@@ -198,4 +199,3 @@ WayFinder is released under **The Unlicense**.
 Third-party dependencies retain their own licenses:
 
 - github.com/reiver/go-telnet — MIT
-- github.com/fyne-io/fyne — BSD-3-Clause

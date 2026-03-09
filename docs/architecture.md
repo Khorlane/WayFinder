@@ -13,22 +13,22 @@ so each subsystem has a clearly defined responsibility.
 
 ## System Model
 
-WayFinder consists of five named subsystems plus solver support:
+WayFinder consists of five primary subsystems plus solver support:
 
 - **WCS** — WayFinder Client Shell
-- **WMP** — WayFinder Map Panel
 - **WEG** — WayFinder Event Gateway
 - **WNE** — WayFinder Navigation Engine
 - **WMR** — WayFinder Mapping Runtime
+- **WTL** — WayFinder Telnet Layer
 - **solver** — constraint/rebuild support used by WMR
 
 Runtime flow:
 
-**WCS → WEG → WNE → WMR**
+**WTL → WEG → WNE → WMR → WCS**
 
 Important:
 
-- **WMP is hosted inside WCS**
+- **WMP is hosted inside WCS as a UI panel**
 - **WMP is not part of the runtime pipeline**
 - **WMR computes layout but does not render UI**
 
@@ -161,7 +161,11 @@ Rendering occurs inside WCS using the WMP panel.
 
 Interpretation of the flow:
 
-1. **WCS** receives input and displays output
+1. **WTL** receives raw MUD text (from simulated mode or live telnet)
+2. **WEG** parses raw game text into normalized events
+3. **WNE** updates navigation/discovery state
+4. **WMR** updates spatial map layout
+5. **WCS** displays output and renders the map using WMP
 2. **WEG** parses raw game text into normalized events
 3. **WNE** updates navigation/discovery state
 4. **WMR** updates spatial map layout

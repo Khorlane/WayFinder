@@ -42,15 +42,15 @@ ARCHITECTURE SUMMARY
 Subsystems:
 
 WCS — WayFinder Client Shell
-WMP — WayFinder Map Panel
 WEG — WayFinder Event Gateway
 WNE — WayFinder Navigation Engine
 WMR — WayFinder Mapping Runtime
+WTL — WayFinder Telnet Layer
 solver — constraint/rebuild support used by WMR
 
 Runtime pipeline:
 
-WCS → WEG → WNE → WMR
+WTL → WEG → WNE → WMR → WCS
 
 Notes:
 - WMP is a UI panel hosted inside WCS

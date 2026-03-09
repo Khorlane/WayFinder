@@ -29,7 +29,7 @@ RUNTIME PIPELINE
 
 The runtime flow is:
 
-WCS → WEG → WNE → WMR
+WTL → WEG → WNE → WMR → WCS
 
 WMP is not part of the runtime pipeline.
 
