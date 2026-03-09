@@ -1,6 +1,6 @@
 WAYFINDER PROJECT CONTEXT
 Paste this into a new ChatGPT or Codex session to restore project context.
-Last updated: 2026-03-08 (commit: 0d0bf87)
+Last updated: 2026-03-09 (commit: pending)
 
 ------------------------------------------------
 PROJECT: WayFinder
@@ -71,10 +71,11 @@ WayFinder/
 │       ├── proc_windows.go
 │       └── shell_windows.go
 ├── wmr/
+│   ├── dev_view.go
 │   ├── runtime.go
-│   ├── local_mode.go
-│   ├── local_mud_output.go
 │   └── solver.go
+├── wtl/
+│   └── simulated_mode.go
 ├── wne/
 │   ├── navigation_session.go
 │   └── navigation_session_test.go
@@ -93,10 +94,10 @@ WayFinder/
 └── Rooms/  (local development world data)
 
 Current repo notes:
-- Local dev harness lives in wmr/local_mode.go
-- Simulated MUD output lives in wmr/local_mud_output.go
+- Local dev harness now lives in wtl/simulated_mode.go
+- Simulated MUD output generation now lives in wtl/simulated_mode.go
 - Solver implementation now lives at wmr/solver.go
-- Exit parsing in local mode is temporary; architectural ownership is WEG
+- Simulator room-file parsing in WTL is temporary harness logic; architectural text parsing ownership is WEG
 
 ------------------------------------------------
 CURRENT IMPLEMENTATION STATUS

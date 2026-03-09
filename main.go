@@ -3,11 +3,11 @@ package main
 import (
 	"os"
 
-	"WayFinder/wmr"
+	"WayFinder/wtl"
 )
 
-// Main boots the current local development runtime path.
+// Main boots the current runtime entrypoint at the WTL boundary.
 // Architectural pipeline target is WTL -> WEG -> WNE -> WMR -> WCS.
 func main() {
-	os.Exit(wmr.Run(os.Args))
+	os.Exit(wtl.Run(os.Args))
 }

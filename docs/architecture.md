@@ -185,8 +185,7 @@ Characteristics:
 
 Primary implementation files:
 
-- `wmr/local_mode.go`
-- `wmr/local_mud_output.go`
+- `wtl/simulated_mode.go`
 
 ---
 

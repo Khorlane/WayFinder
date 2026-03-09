@@ -36,6 +36,11 @@ WMP is not part of the runtime pipeline.
 ------------------------------------------------
 COMPONENT RESPONSIBILITIES
 
+WTL — WayFinder Telnet Layer
+- owns inbound MUD text sourcing
+- supports simulated mode (development harness) and future live mode
+- forwards raw text into WEG
+
 WEG — WayFinder Event Gateway
 - parses MUD text
 - emits normalized events

@@ -177,6 +177,16 @@ type mapperSnapshot struct {
 
 var uiOut io.Writer = os.Stdout
 
+// SetUIOutput allows runtime hosts (for example WTL simulated mode) to route
+// mapper textual output through a shared writer.
+func SetUIOutput(w io.Writer) {
+	if w == nil {
+		uiOut = os.Stdout
+		return
+	}
+	uiOut = w
+}
+
 func uiPrint(a ...any) {
 	fmt.Fprint(uiOut, a...)
 }

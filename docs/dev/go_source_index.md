@@ -35,14 +35,14 @@ WayFinder/
 │       └── shell_windows.go
 ├── weg/
 ├── wmr/
-│   ├── local_mode.go
-│   ├── local_mud_output.go
+│   ├── dev_view.go
 │   ├── runtime.go
 │   └── solver.go
 ├── wne/
 │   ├── navigation_session.go
 │   └── navigation_session_test.go
 ├── wtl/
+│   └── simulated_mode.go
 ├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md
@@ -54,7 +54,8 @@ WayFinder/
 ├── WayFinder.code-workspace
 ├── WayFinder.exe
 ├── WayFinder_refactor_step1_codex_instructions.md
-└── WayFinder_refactor_step1_docs_task.md
+├── WayFinder_refactor_step1_docs_task.md
+└── WayFinder_refactor_step2_codex_instructions.md
 ```
 
 ## Go File Tree
@@ -63,12 +64,12 @@ WayFinder/
 - `main.go`
 - `wcs/win32/proc_windows.go`
 - `wcs/win32/shell_windows.go`
-- `wmr/local_mode.go`
-- `wmr/local_mud_output.go`
+- `wmr/dev_view.go`
 - `wmr/runtime.go`
 - `wmr/solver.go`
 - `wne/navigation_session.go`
 - `wne/navigation_session_test.go`
+- `wtl/simulated_mode.go`
 
 ## `docs/dev/scripts/generate_go_source_index.go`
 
@@ -158,66 +159,18 @@ Variables:
 - hWICLbl (line 90)
 - hWMPLbl (line 91)
 
-## `wmr/local_mode.go`
+## `wmr/dev_view.go`
 
 Types:
-- World (line 127)
-- DiscoveryState (line 165)
-- wneTopologyAdapter (line 209)
-- wneWorldAdapter (line 235)
-- wneMapperAdapter (line 261)
-- wneDiscoveryAdapter (line 273)
+- discoveredView (line 5)
+- worldView (line 9)
 
 Functions:
-- PrintGrid10x10 (method on *Mapper) (line 15)
-- PrintGrid10x10Discovered (method on *Mapper) (line 19)
-- PrintRooms (method on *Mapper) (line 81)
-- PrintRoomsDiscovered (method on *Mapper) (line 85)
-- ExitsFrom (method on *World) (line 132)
-- Neighbors (method on *World) (line 144)
-- HasRoom (method on *World) (line 157)
-- NewDiscoveryState (line 169)
-- Discover (method on *DiscoveryState) (line 175)
-- IsDiscovered (method on *DiscoveryState) (line 179)
-- visibleExits (line 187)
-- discoveredRoomIDs (line 197)
-- toWNERoomID (line 206)
-- fromWNERoomID (line 207)
-- ExitsFrom (method on wneTopologyAdapter) (line 213)
-- Neighbors (method on wneTopologyAdapter) (line 222)
-- HasRoom (method on wneTopologyAdapter) (line 231)
-- ExitsFrom (method on wneWorldAdapter) (line 239)
-- Neighbors (method on wneWorldAdapter) (line 248)
-- HasRoom (method on wneWorldAdapter) (line 257)
-- BindTopology (method on wneMapperAdapter) (line 265)
-- Enter (method on wneMapperAdapter) (line 269)
-- Discover (method on wneDiscoveryAdapter) (line 277)
-- LoadWorld (line 281)
-- ensureRoom (method on *World) (line 318)
-- addExit (method on *World) (line 327)
-- parseRoomFileIntoWorld (line 338)
-- Run (line 422)
-
-Variables:
-- (none)
-
-## `wmr/local_mud_output.go`
-
-Types:
-- localRoomPresentation (line 24)
-
-Functions:
-- emitLocalPrompt (line 31)
-- emitSimulatedRoomOutput (line 35)
-- emitSimulatedMoveFailure (line 52)
-- emitSimulatedSystemText (line 63)
-- loadLocalRoomPresentation (line 69)
-- normalizeDescription (line 120)
-- wrapDescriptionLines (line 135)
-- formatSimulatedExits (line 158)
-- exitSortRank (line 183)
-- formatExitDisplayName (line 206)
-- toRoomIDExits (line 233)
+- PrintGrid10x10 (method on *Mapper) (line 13)
+- PrintGrid10x10Discovered (method on *Mapper) (line 17)
+- PrintRooms (method on *Mapper) (line 79)
+- PrintRoomsDiscovered (method on *Mapper) (line 83)
+- visibleExits (line 125)
 
 Variables:
 - (none)
@@ -235,64 +188,65 @@ Types:
 - collisionError (line 154)
 - roomSnapshot (line 166)
 - mapperSnapshot (line 172)
-- plannedMove (line 1008)
-- Topology (line 1645)
+- plannedMove (line 1018)
+- Topology (line 1655)
 
 Functions:
 - relationForKey (line 66)
 - BuildConstraintSet (method on *Mapper) (line 84)
 - Error (method on *lockedAdjViolationError) (line 149)
 - Error (method on *collisionError) (line 161)
-- uiPrint (line 180)
-- uiPrintf (line 184)
-- uiPrintln (line 188)
-- setupLogging (line 192)
-- NewMapper (line 207)
-- BindTopology (method on *Mapper) (line 218)
-- SetDebugWriter (method on *Mapper) (line 222)
-- SetSolverProvider (method on *Mapper) (line 230)
-- debugln (method on *Mapper) (line 238)
-- debugf (method on *Mapper) (line 242)
-- colName (line 246)
-- cellLabel (line 248)
-- normalizeDirName (line 261)
-- dirDelta (line 287)
-- getRoom (method on *Mapper) (line 312)
-- clearOcc (method on *Mapper) (line 321)
-- setOcc (method on *Mapper) (line 329)
-- edgeAlignedAndOrdered (line 350)
-- roomBetweenAxis (line 373)
-- noRoomBetweenAxis (method on *Mapper) (line 391)
-- refreshLockedAdjacencies (method on *Mapper) (line 411)
-- validateLockedAdjacencies (method on *Mapper) (line 442)
-- validateConstraintSet (method on *Mapper) (line 446)
-- solverContext (method on *Mapper) (line 466)
-- solver (method on *Mapper) (line 494)
-- toSolverConstraintSet (method on *Mapper) (line 502)
-- shiftWhere (method on *Mapper) (line 529)
-- blockKey (line 606)
-- formatBlockRooms (line 615)
-- cloneBlock (line 624)
-- printRejection (method on *Mapper) (line 632)
-- destinationCandidateBlocks (method on *Mapper) (line 652)
-- moveDestinationWithCandidates (method on *Mapper) (line 759)
-- validateBlockMove (method on *Mapper) (line 852)
-- moveBlock (method on *Mapper) (line 921)
-- captureSnapshot (method on *Mapper) (line 938)
-- restoreSnapshot (method on *Mapper) (line 963)
-- stateSignature (method on *Mapper) (line 980)
-- holeOpenNow (method on *Mapper) (line 998)
-- smallestBlocks (line 1015)
-- planningBlocks (line 1031)
-- blockHasID (line 1078)
-- plannerDeltas (line 1083)
-- planMakeRoomMultiStepDepth (method on *Mapper) (line 1110)
-- planMakeRoomMultiStep (method on *Mapper) (line 1257)
-- validateHoleOpens (method on *Mapper) (line 1306)
-- makeRoom (method on *Mapper) (line 1345)
-- rebuildDiscoveredLayout (method on *Mapper) (line 1481)
-- Enter (method on *Mapper) (line 1514)
-- enterIncremental (method on *Mapper) (line 1532)
+- SetUIOutput (line 182)
+- uiPrint (line 190)
+- uiPrintf (line 194)
+- uiPrintln (line 198)
+- setupLogging (line 202)
+- NewMapper (line 217)
+- BindTopology (method on *Mapper) (line 228)
+- SetDebugWriter (method on *Mapper) (line 232)
+- SetSolverProvider (method on *Mapper) (line 240)
+- debugln (method on *Mapper) (line 248)
+- debugf (method on *Mapper) (line 252)
+- colName (line 256)
+- cellLabel (line 258)
+- normalizeDirName (line 271)
+- dirDelta (line 297)
+- getRoom (method on *Mapper) (line 322)
+- clearOcc (method on *Mapper) (line 331)
+- setOcc (method on *Mapper) (line 339)
+- edgeAlignedAndOrdered (line 360)
+- roomBetweenAxis (line 383)
+- noRoomBetweenAxis (method on *Mapper) (line 401)
+- refreshLockedAdjacencies (method on *Mapper) (line 421)
+- validateLockedAdjacencies (method on *Mapper) (line 452)
+- validateConstraintSet (method on *Mapper) (line 456)
+- solverContext (method on *Mapper) (line 476)
+- solver (method on *Mapper) (line 504)
+- toSolverConstraintSet (method on *Mapper) (line 512)
+- shiftWhere (method on *Mapper) (line 539)
+- blockKey (line 616)
+- formatBlockRooms (line 625)
+- cloneBlock (line 634)
+- printRejection (method on *Mapper) (line 642)
+- destinationCandidateBlocks (method on *Mapper) (line 662)
+- moveDestinationWithCandidates (method on *Mapper) (line 769)
+- validateBlockMove (method on *Mapper) (line 862)
+- moveBlock (method on *Mapper) (line 931)
+- captureSnapshot (method on *Mapper) (line 948)
+- restoreSnapshot (method on *Mapper) (line 973)
+- stateSignature (method on *Mapper) (line 990)
+- holeOpenNow (method on *Mapper) (line 1008)
+- smallestBlocks (line 1025)
+- planningBlocks (line 1041)
+- blockHasID (line 1088)
+- plannerDeltas (line 1093)
+- planMakeRoomMultiStepDepth (method on *Mapper) (line 1120)
+- planMakeRoomMultiStep (method on *Mapper) (line 1267)
+- validateHoleOpens (method on *Mapper) (line 1316)
+- makeRoom (method on *Mapper) (line 1355)
+- rebuildDiscoveredLayout (method on *Mapper) (line 1491)
+- Enter (method on *Mapper) (line 1524)
+- enterIncremental (method on *Mapper) (line 1542)
 
 Variables:
 - uiOut (line 178)
@@ -363,3 +317,58 @@ Functions:
 
 Variables:
 - (none)
+
+## `wtl/simulated_mode.go`
+
+Types:
+- World (line 57)
+- DiscoveryState (line 112)
+- wneTopologyAdapter (line 146)
+- wneWorldAdapter (line 172)
+- wneMapperAdapter (line 198)
+- wneDiscoveryAdapter (line 210)
+- localRoomPresentation (line 335)
+
+Functions:
+- uiPrint (line 27)
+- uiPrintf (line 31)
+- uiPrintln (line 35)
+- setupLogging (line 39)
+- ExitsFrom (method on *World) (line 62)
+- Neighbors (method on *World) (line 74)
+- HasRoom (method on *World) (line 87)
+- ensureRoom (method on *World) (line 95)
+- addExit (method on *World) (line 104)
+- NewDiscoveryState (line 116)
+- Discover (method on *DiscoveryState) (line 122)
+- IsDiscovered (method on *DiscoveryState) (line 126)
+- discoveredRoomIDs (line 134)
+- toWNERoomID (line 143)
+- fromWNERoomID (line 144)
+- ExitsFrom (method on wneTopologyAdapter) (line 150)
+- Neighbors (method on wneTopologyAdapter) (line 159)
+- HasRoom (method on wneTopologyAdapter) (line 168)
+- ExitsFrom (method on wneWorldAdapter) (line 176)
+- Neighbors (method on wneWorldAdapter) (line 185)
+- HasRoom (method on wneWorldAdapter) (line 194)
+- BindTopology (method on wneMapperAdapter) (line 202)
+- Enter (method on wneMapperAdapter) (line 206)
+- Discover (method on wneDiscoveryAdapter) (line 214)
+- LoadWorld (line 218)
+- parseRoomFileIntoWorld (line 255)
+- emitLocalPrompt (line 342)
+- emitSimulatedRoomOutput (line 346)
+- emitSimulatedMoveFailure (line 363)
+- emitSimulatedSystemText (line 374)
+- loadLocalRoomPresentation (line 380)
+- normalizeDescription (line 431)
+- wrapDescriptionLines (line 446)
+- formatSimulatedExits (line 469)
+- exitSortRank (line 494)
+- formatExitDisplayName (line 517)
+- toRoomIDExits (line 544)
+- normalizeDirName (line 552)
+- Run (line 577)
+
+Variables:
+- uiOut (line 25)
