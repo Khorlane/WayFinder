@@ -1,6 +1,6 @@
 WAYFINDER PROJECT CONTEXT
 Paste this into a new ChatGPT or Codex session to restore project context.
-Last updated: 2026-03-09 (commit: pending)
+Last updated: 2026-03-09 (commit: 96b2e26)
 
 ------------------------------------------------
 PROJECT: WayFinder
@@ -113,9 +113,13 @@ Local development harness: COMPLETE
 Remaining work:
 - WF-001 minimal runtime switch (local vs live telnet)
 - WF-002 remove temporary Rooms/ dataset when no longer needed
-- WF-010 isolate MUD input boundary: WTL as inbound text source (WTL -> WEG -> WNE -> WMR -> WCS)
 
-Estimated completion: ~75–80%
+Recently completed:
+- WF-010 isolate MUD input boundary with enforced pipeline WTL -> WEG -> WNE -> WMR -> WCS
+- Simulated harness isolated under WTL
+- WEG established as the first interpreter boundary for simulated inbound text
+
+Estimated completion: ~85–90%
 
 ------------------------------------------------
 AI EDITING RULES
@@ -126,7 +130,7 @@ AI EDITING RULES
 4. Keep repository structure stable.
 5. Describe the repository as it exists today, not planned future state.
 6. Do NOT describe planned features as already implemented.
-7. Preserve the current WCS/WEG/WNE/WMR/WMP split.
+7. Preserve the current WTL/WEG/WNE/WMR/WCS split (with WMP hosted inside WCS).
 8. Keep local simulation support under the current runtime structure unless
    explicitly redesigned.
 
