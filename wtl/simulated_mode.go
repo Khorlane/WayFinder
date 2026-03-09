@@ -132,10 +132,10 @@ func (d *DiscoveryState) IsDiscovered(roomID wmr.RoomID) bool {
 	return ok
 }
 
-func discoveredRoomIDs(discovery *DiscoveryState) []wmr.RoomID {
-	ids := make([]wmr.RoomID, 0, len(discovery.discoveredRooms))
+func discoveredRoomIDs(discovery *DiscoveryState) []wne.RoomID {
+	ids := make([]wne.RoomID, 0, len(discovery.discoveredRooms))
 	for id := range discovery.discoveredRooms {
-		ids = append(ids, id)
+		ids = append(ids, toWNERoomID(id))
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	return ids
@@ -612,15 +612,12 @@ func Run(args []string) int {
 	}
 	gateway := weg.NewSimulatedGateway(
 		session,
-		mapper,
-		world,
-		discovery,
-		func() []wmr.RoomID { return discoveredRoomIDs(discovery) },
+		func() []wne.RoomID { return discoveredRoomIDs(discovery) },
 	)
 
 	uiPrintln("Commands: n s e w ne nw se sw | look | map | coords | show | gui | quit")
 	emitSimulatedRoomOutput(worldPath, wmr.RoomID(session.CurrentRoom()), toRoomIDExits(session.CurrentExits()))
-	gateway.PrintMap()
+	mapper.PrintGrid10x10Discovered(discovery)
 
 	in := bufio.NewReader(os.Stdin)
 	for {
@@ -642,14 +639,14 @@ func Run(args []string) int {
 			wcswin32.RunWCS()
 		case weg.KindLook:
 			uiPrintln()
-			emitSimulatedRoomOutput(worldPath, result.CurrentRoom, result.CurrentExits)
-			gateway.PrintMap()
+			emitSimulatedRoomOutput(worldPath, wmr.RoomID(result.CurrentRoom), toRoomIDExits(result.CurrentExits))
+			mapper.PrintGrid10x10Discovered(discovery)
 		case weg.KindMap:
 			uiPrintln()
-			gateway.PrintMap()
+			mapper.PrintGrid10x10Discovered(discovery)
 		case weg.KindCoords:
 			uiPrintln()
-			gateway.PrintCoords()
+			mapper.PrintRoomsDiscovered(world, discovery)
 		case weg.KindShow:
 			uiPrintln()
 			uiPrintln("Discovered rooms:")
@@ -669,8 +666,8 @@ func Run(args []string) int {
 			emitSimulatedSystemText(fmt.Sprintf("System: %v", result.MoveErr))
 		case weg.KindMoveOK:
 			uiPrintln()
-			emitSimulatedRoomOutput(worldPath, result.CurrentRoom, result.CurrentExits)
-			gateway.PrintMap()
+			emitSimulatedRoomOutput(worldPath, wmr.RoomID(result.CurrentRoom), toRoomIDExits(result.CurrentExits))
+			mapper.PrintGrid10x10Discovered(discovery)
 		default:
 			uiPrintln()
 			emitSimulatedSystemText("Huh?")

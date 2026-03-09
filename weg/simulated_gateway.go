@@ -3,7 +3,6 @@ package weg
 import (
 	"strings"
 
-	"WayFinder/wmr"
 	"WayFinder/wne"
 )
 
@@ -19,37 +18,23 @@ const (
 	KindMoveFail = "move_fail"
 )
 
-type discoveredView interface {
-	IsDiscovered(wmr.RoomID) bool
-}
-
-type worldView interface {
-	ExitsFrom(wmr.RoomID) map[string]wmr.RoomID
-}
-
 type Result struct {
 	Kind         string
 	Direction    string
-	CurrentRoom  wmr.RoomID
-	CurrentExits map[string]wmr.RoomID
-	Discovered   []wmr.RoomID
+	CurrentRoom  wne.RoomID
+	CurrentExits map[string]wne.RoomID
+	Discovered   []wne.RoomID
 	MoveErr      error
 }
 
 type SimulatedGateway struct {
 	nav           wne.Navigator
-	mapper        *wmr.Mapper
-	world         worldView
-	discovery     discoveredView
-	discoveredIDs func() []wmr.RoomID
+	discoveredIDs func() []wne.RoomID
 }
 
-func NewSimulatedGateway(nav wne.Navigator, mapper *wmr.Mapper, world worldView, discovery discoveredView, discoveredIDs func() []wmr.RoomID) *SimulatedGateway {
+func NewSimulatedGateway(nav wne.Navigator, discoveredIDs func() []wne.RoomID) *SimulatedGateway {
 	return &SimulatedGateway{
 		nav:           nav,
-		mapper:        mapper,
-		world:         world,
-		discovery:     discovery,
 		discoveredIDs: discoveredIDs,
 	}
 }
@@ -95,20 +80,12 @@ func (g *SimulatedGateway) IngestRawText(raw string) Result {
 	return g.snapshot(KindMoveOK, dir)
 }
 
-func (g *SimulatedGateway) PrintMap() {
-	g.mapper.PrintGrid10x10Discovered(g.discovery)
-}
-
-func (g *SimulatedGateway) PrintCoords() {
-	g.mapper.PrintRoomsDiscovered(g.world, g.discovery)
-}
-
 func (g *SimulatedGateway) snapshot(kind, dir string) Result {
 	return Result{
 		Kind:         kind,
 		Direction:    dir,
-		CurrentRoom:  wmr.RoomID(g.nav.CurrentRoom()),
-		CurrentExits: toRoomIDExits(g.nav.CurrentExits()),
+		CurrentRoom:  g.nav.CurrentRoom(),
+		CurrentExits: g.nav.CurrentExits(),
 	}
 }
 
@@ -134,12 +111,4 @@ func normalizeDirName(s string) string {
 	default:
 		return ""
 	}
-}
-
-func toRoomIDExits(exits map[string]wne.RoomID) map[string]wmr.RoomID {
-	out := make(map[string]wmr.RoomID, len(exits))
-	for dir, id := range exits {
-		out[dir] = wmr.RoomID(id)
-	}
-	return out
 }

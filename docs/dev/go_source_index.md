@@ -57,7 +57,8 @@ WayFinder/
 ├── WayFinder_refactor_step1_codex_instructions.md
 ├── WayFinder_refactor_step1_docs_task.md
 ├── WayFinder_refactor_step2_codex_instructions.md
-└── WayFinder_refactor_step3_codex_instructions.md
+├── WayFinder_refactor_step3_codex_instructions.md
+└── WayFinder_refactor_step4_codex_instructions.md
 ```
 
 ## Go File Tree
@@ -165,19 +166,14 @@ Variables:
 ## `weg/simulated_gateway.go`
 
 Types:
-- discoveredView (line 22)
-- worldView (line 26)
-- Result (line 30)
-- SimulatedGateway (line 39)
+- Result (line 21)
+- SimulatedGateway (line 30)
 
 Functions:
-- NewSimulatedGateway (line 47)
-- IngestRawText (method on *SimulatedGateway) (line 57)
-- PrintMap (method on *SimulatedGateway) (line 98)
-- PrintCoords (method on *SimulatedGateway) (line 102)
-- snapshot (method on *SimulatedGateway) (line 106)
-- normalizeDirName (line 115)
-- toRoomIDExits (line 139)
+- NewSimulatedGateway (line 35)
+- IngestRawText (method on *SimulatedGateway) (line 42)
+- snapshot (method on *SimulatedGateway) (line 83)
+- normalizeDirName (line 92)
 
 Variables:
 - (none)
