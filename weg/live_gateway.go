@@ -7,7 +7,7 @@ import (
 
 // LiveText carries transcript text and the current input masking state.
 type LiveText struct {
-	Text      string
+	Spans     []LiveSpan
 	MaskInput bool
 }
 
@@ -16,7 +16,11 @@ type LiveGateway struct {
 	display func(LiveText)
 	tail    string
 	partial string
+	ansi    ansiRendition
 }
+
+// The append-only transcript has no cursor backtracking.
+var liveTextControls = strings.NewReplacer("\x00", "", "\b", "", "\r\n", "\r\n", "\n", "\r\n")
 
 func NewLiveGateway(display func(LiveText)) *LiveGateway {
 	return &LiveGateway{display: display}
@@ -33,14 +37,15 @@ func (g *LiveGateway) Write(p []byte) (int, error) {
 			break
 		}
 	}
-	if text != "" {
-		text = strings.ReplaceAll(text, "\x00", "")
-		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\n", "\r\n")
-		g.tail = strings.ToLower(g.tail + text)
-		g.tail = g.tail[max(0, len(g.tail)-32):]
-		prompt := strings.TrimSpace(g.tail)
+	spans := g.ansi.spans(liveTextControls.Replace(text))
+	if len(spans) > 0 {
+		for _, span := range spans {
+			g.tail += span.Text
+			g.tail = g.tail[max(0, len(g.tail)-32):]
+		}
+		prompt := strings.ToLower(strings.TrimSpace(g.tail))
 		g.display(LiveText{
-			Text:      text,
+			Spans:     spans,
 			MaskInput: strings.HasSuffix(prompt, "password?") || strings.HasSuffix(prompt, "password:"),
 		})
 	}

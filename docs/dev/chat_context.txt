@@ -72,6 +72,7 @@ WayFinder/
 │       ├── proc_windows.go
 │       └── shell_windows.go
 ├── weg/
+│   ├── ansi.go
 │   ├── live_gateway.go
 │   └── simulated_gateway.go
 ├── wmr/
@@ -101,7 +102,7 @@ WayFinder/
 Current repo notes:
 - Local dev harness now lives in wtl/simulated_mode.go
 - Live mode in wtl/live_mode.go owns the TCP connection and sends commands
-- WEG recognizes password prompts and WCS hosts the live transcript and input
+- WEG decodes ANSI foreground colors and password prompts, and WCS hosts the live transcript and input
 - Simulated MUD output generation now lives in wtl/simulated_mode.go
 - Simulated command text is first interpreted by WEG at weg/simulated_gateway.go before WNE movement
 - Solver implementation now lives at wmr/solver.go

@@ -191,9 +191,9 @@ Primary implementation files:
 
 ## Live Mode
 
-WTL owns the TCP connection and sends commands captured by WCS. WEG recognizes
-password prompts in the incoming stream. WCS displays the transcript in the
-Output View and masks input in the Input Console during password prompts.
+WTL owns the TCP connection and sends commands captured by WCS. WEG decodes ANSI
+foreground colors and recognizes password prompts in the incoming stream. WCS
+displays the colored transcript and masks input during password prompts.
 The live text session starts without a navigation session or map projection.
 
 Planned integration library:

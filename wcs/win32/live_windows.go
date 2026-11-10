@@ -29,7 +29,16 @@ const (
 	emScrollCaret   = 0x00B7
 	emReplaceSel    = 0x00C2
 	emSetLimitText  = 0x00C5
+	emSetReadOnly   = 0x00CF
 	emSetPassword   = 0x00CC
+
+	emExLimitText   = 0x0435
+	emSetBackground = 0x0443
+	emSetCharFormat = 0x0444
+	emGetTextLength = 0x045F
+	cfmColor        = 0x40000000
+	scfSelection    = 0x0001
+	unicodeCodePage = 1200
 
 	vkReturn          = 0x0D
 	ansiFixedFont     = 11
@@ -41,6 +50,7 @@ type livePlayer func(context.Context, string, <-chan string, func(weg.LiveText),
 
 type liveUpdate struct {
 	text         weg.LiveText
+	status       string
 	connected    bool
 	disconnected bool
 }
@@ -55,6 +65,27 @@ type liveShell struct {
 }
 
 var liveWindow *liveShell
+
+type charFormat struct {
+	size, mask, effects uint32
+	height, offset      int32
+	textColor           uint32
+	charset, family     byte
+	faceName            [32]uint16
+}
+
+type textLengthOptions struct {
+	flags, codePage uint32
+}
+
+// COLORREF values are ordered as default, ANSI normal colors, then bright colors.
+var transcriptColors = [...]uint32{
+	0x00DDDDDD,
+	0x00404040, 0x004848CF, 0x0064B458, 0x0048B4CC,
+	0x00D18A54, 0x00BA60B8, 0x00B8B050, 0x00C0C0C0,
+	0x00808080, 0x006B6BFF, 0x0074E674, 0x0073F1FF,
+	0x00FFA87A, 0x00FF80E8, 0x00F5F582, 0x00FFFFFF,
+}
 
 // RunLiveWCS hosts the transcript and command controls for a live game session.
 func RunLiveWCS(address string, play livePlayer) {
@@ -72,11 +103,15 @@ func RunLiveWCS(address string, play livePlayer) {
 }
 
 func createLivePanels(parent uintptr) {
+	if err := msftedit.Load(); err != nil {
+		panic(err)
+	}
 	instance := getModuleHandle()
+	transcriptClass := syscall.StringToUTF16Ptr("RICHEDIT50W")
 	editClass := syscall.StringToUTF16Ptr("EDIT")
 	empty := syscall.StringToUTF16Ptr("")
 	const baseStyle = wsChild | wsVisible | wsBorder
-	hWOV = createWindowEx(0, editClass, empty, baseStyle|wsVScroll|esMultiline|esAutoVScroll|esReadOnly, 0, 0, 0, 0, parent, 0, instance, 0)
+	hWOV = createWindowEx(0, transcriptClass, empty, baseStyle|wsVScroll|esMultiline|esAutoVScroll|esReadOnly, 0, 0, 0, 0, parent, 0, instance, 0)
 	hWIC = createWindowEx(0, editClass, empty, baseStyle|wsDisabled|esAutoHScroll, 0, 0, 0, 0, parent, 0, instance, 0)
 	hWICLbl = createWindowEx(0, syscall.StringToUTF16Ptr("STATIC"), syscall.StringToUTF16Ptr("Command (Enter to send)"), wsChild|wsVisible, 0, 0, 0, 0, parent, 0, instance, 0)
 	if hWOV == 0 || hWIC == 0 || hWICLbl == 0 {
@@ -86,7 +121,8 @@ func createLivePanels(parent uintptr) {
 	procSendMessageW.Call(hWOV, wmSetFont, font, 1)
 	procSendMessageW.Call(hWIC, wmSetFont, font, 1)
 	procSendMessageW.Call(hWICLbl, wmSetFont, font, 1)
-	procSendMessageW.Call(hWOV, emSetLimitText, maxTranscriptSize*2, 0)
+	procSendMessageW.Call(hWOV, emSetBackground, 0, 0x001C1C1C)
+	procSendMessageW.Call(hWOV, emExLimitText, 0, maxTranscriptSize*2)
 	procSendMessageW.Call(hWIC, emSetLimitText, 4096, 0)
 }
 
@@ -107,9 +143,9 @@ func layoutLivePanels(hwnd uintptr) {
 }
 
 func (s *liveShell) start(hwnd uintptr) {
-	appendTranscript("Connecting to " + s.address + "...\r\n\r\n")
+	appendTranscript(weg.LiveSpan{Text: "Connecting to " + s.address + "...\r\n\r\n"})
 	if id, _, _ := procSetTimer.Call(hwnd, liveTimer, 30, 0); id == 0 {
-		appendTranscript("Could not start the game display.\r\n")
+		appendTranscript(weg.LiveSpan{Text: "Could not start the game display.\r\n"})
 		return
 	}
 	go func() {
@@ -122,7 +158,7 @@ func (s *liveShell) start(hwnd uintptr) {
 		if err != nil {
 			message = err.Error()
 		}
-		s.postUpdate(liveUpdate{text: weg.LiveText{Text: "\r\n\r\n" + message + "\r\n"}, disconnected: true})
+		s.postUpdate(liveUpdate{status: message, disconnected: true})
 	}()
 }
 
@@ -137,12 +173,13 @@ func (s *liveShell) drainUpdates() {
 	for range cap(s.updates) {
 		select {
 		case update := <-s.updates:
-			appendTranscript(update.text.Text)
+			appendTranscript(update.text.Spans...)
 			if update.connected {
 				procEnableWindow.Call(hWIC, 1)
 				procSetFocus.Call(hWIC)
 			}
 			if update.disconnected {
+				appendTranscript(weg.LiveSpan{Text: "\r\n\r\n" + update.status + "\r\n"})
 				procEnableWindow.Call(hWIC, 0)
 				setWindowText(hWIC, "")
 			}
@@ -168,15 +205,18 @@ func (s *liveShell) submitCommand() {
 	case s.commands <- syscall.UTF16ToString(buffer):
 		setWindowText(hWIC, "")
 	default:
-		appendTranscript("\r\nCommand queue is busy. Press Enter again to retry.\r\n")
+		appendTranscript(weg.LiveSpan{Text: "\r\nCommand queue is busy. Press Enter again to retry.\r\n"})
 	}
 }
 
-func appendTranscript(text string) {
-	if text == "" {
+func appendTranscript(spans ...weg.LiveSpan) {
+	if len(spans) == 0 {
 		return
 	}
-	length, _, _ := procSendMessageW.Call(hWOV, wmGetTextLength, 0, 0)
+	// Rich Edit selection offsets count each paragraph break as one character.
+	options := textLengthOptions{codePage: unicodeCodePage}
+	length, _, _ := procSendMessageW.Call(hWOV, emGetTextLength, uintptr(unsafe.Pointer(&options)), 0)
+	procSendMessageW.Call(hWOV, emSetReadOnly, 0, 0)
 	if length > maxTranscriptSize {
 		remove := length - maxTranscriptSize/2
 		procSendMessageW.Call(hWOV, emSetSel, 0, remove)
@@ -184,7 +224,14 @@ func appendTranscript(text string) {
 		length -= remove
 	}
 	procSendMessageW.Call(hWOV, emSetSel, length, length)
-	procSendMessageW.Call(hWOV, emReplaceSel, 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(text))))
+	format := charFormat{mask: cfmColor}
+	format.size = uint32(unsafe.Sizeof(format))
+	for _, span := range spans {
+		format.textColor = transcriptColors[span.Color]
+		procSendMessageW.Call(hWOV, emSetCharFormat, scfSelection, uintptr(unsafe.Pointer(&format)))
+		procSendMessageW.Call(hWOV, emReplaceSel, 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(span.Text))))
+	}
+	procSendMessageW.Call(hWOV, emSetReadOnly, 1, 0)
 	procSendMessageW.Call(hWOV, emScrollCaret, 0, 0)
 }
 

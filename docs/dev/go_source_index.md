@@ -35,6 +35,7 @@ WayFinder/
 │       ├── proc_windows.go
 │       └── shell_windows.go
 ├── weg/
+│   ├── ansi.go
 │   ├── live_gateway.go
 │   └── simulated_gateway.go
 ├── wmr/
@@ -66,6 +67,7 @@ WayFinder/
 - `wcs/win32/live_windows.go`
 - `wcs/win32/proc_windows.go`
 - `wcs/win32/shell_windows.go`
+- `weg/ansi.go`
 - `weg/live_gateway.go`
 - `weg/simulated_gateway.go`
 - `wmr/dev_view.go`
@@ -112,23 +114,26 @@ Variables:
 ## `wcs/win32/live_windows.go`
 
 Types:
-- livePlayer (line 40)
-- liveUpdate (line 42)
-- liveShell (line 48)
+- livePlayer (line 49)
+- liveUpdate (line 51)
+- liveShell (line 58)
+- charFormat (line 69)
+- textLengthOptions (line 77)
 
 Functions:
-- RunLiveWCS (line 60)
-- createLivePanels (line 74)
-- layoutLivePanels (line 93)
-- start (method on *liveShell) (line 109)
-- postUpdate (method on *liveShell) (line 129)
-- drainUpdates (method on *liveShell) (line 136)
-- submitCommand (method on *liveShell) (line 163)
-- appendTranscript (line 175)
-- setWindowText (line 191)
+- RunLiveWCS (line 91)
+- createLivePanels (line 105)
+- layoutLivePanels (line 129)
+- start (method on *liveShell) (line 145)
+- postUpdate (method on *liveShell) (line 165)
+- drainUpdates (method on *liveShell) (line 172)
+- submitCommand (method on *liveShell) (line 200)
+- appendTranscript (line 212)
+- setWindowText (line 238)
 
 Variables:
-- liveWindow (line 57)
+- liveWindow (line 67)
+- transcriptColors (line 82)
 
 ## `wcs/win32/proc_windows.go`
 
@@ -142,27 +147,28 @@ Variables:
 - user32 (line 6)
 - kernel32 (line 7)
 - gdi32 (line 8)
-- procAdjustWindowRectEx (line 10)
-- procCreateWindowExW (line 11)
-- procDefWindowProcW (line 12)
-- procDestroyWindow (line 13)
-- procDispatchMessageW (line 14)
-- procEnableWindow (line 15)
-- procGetClientRect (line 16)
-- procGetMessageW (line 17)
-- procKillTimer (line 18)
-- procLoadImageW (line 19)
-- procMoveWindow (line 20)
-- procPostQuitMessage (line 21)
-- procRegisterClassExW (line 22)
-- procSendMessageW (line 23)
-- procSetFocus (line 24)
-- procSetTimer (line 25)
-- procShowWindow (line 26)
-- procTranslateMessage (line 27)
-- procUpdateWindow (line 28)
-- procGetModuleHandleW (line 30)
-- procGetStockObject (line 31)
+- msftedit (line 9)
+- procAdjustWindowRectEx (line 11)
+- procCreateWindowExW (line 12)
+- procDefWindowProcW (line 13)
+- procDestroyWindow (line 14)
+- procDispatchMessageW (line 15)
+- procEnableWindow (line 16)
+- procGetClientRect (line 17)
+- procGetMessageW (line 18)
+- procKillTimer (line 19)
+- procLoadImageW (line 20)
+- procMoveWindow (line 21)
+- procPostQuitMessage (line 22)
+- procRegisterClassExW (line 23)
+- procSendMessageW (line 24)
+- procSetFocus (line 25)
+- procSetTimer (line 26)
+- procShowWindow (line 27)
+- procTranslateMessage (line 28)
+- procUpdateWindow (line 29)
+- procGetModuleHandleW (line 31)
+- procGetStockObject (line 32)
 
 ## `wcs/win32/shell_windows.go`
 
@@ -192,6 +198,21 @@ Variables:
 - hWICLbl (line 92)
 - hWMPLbl (line 93)
 
+## `weg/ansi.go`
+
+Types:
+- LiveColor (line 9)
+- LiveSpan (line 11)
+- ansiRendition (line 16)
+
+Functions:
+- spans (method on *ansiRendition) (line 22)
+- color (method on *ansiRendition) (line 65)
+- apply (method on *ansiRendition) (line 72)
+
+Variables:
+- (none)
+
 ## `weg/live_gateway.go`
 
 Types:
@@ -199,11 +220,11 @@ Types:
 - LiveGateway (line 15)
 
 Functions:
-- NewLiveGateway (line 21)
-- Write (method on *LiveGateway) (line 25)
+- NewLiveGateway (line 25)
+- Write (method on *LiveGateway) (line 29)
 
 Variables:
-- (none)
+- liveTextControls (line 23)
 
 ## `weg/simulated_gateway.go`
 
