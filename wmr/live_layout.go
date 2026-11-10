@@ -12,7 +12,8 @@ type Layout struct {
 // PlaceArrival projects a server-confirmed visit using the existing mapper.
 func (m *Mapper) PlaceArrival(id, from RoomID, direction string) error {
 	room := m.getRoom(id)
-	if anchor := m.rooms[from]; direction != "" && anchor != nil && anchor.Placed {
+	_, _, planar := dirDelta(direction)
+	if anchor := m.rooms[from]; planar && anchor != nil && anchor.Placed {
 		return m.placeFrom(room, anchor, direction)
 	}
 	if room.Placed {
@@ -51,6 +52,17 @@ func (m *Mapper) PlaceArrival(id, from RoomID, direction string) error {
 	m.setOcc(id, 1, rightmost+2)
 	m.cur = room
 	return nil
+}
+
+// RefreshRoomExits removes constraints for outgoing edges the server replaced.
+func (m *Mapper) RefreshRoomExits(id RoomID) {
+	exits := m.topo.ExitsFrom(id)
+	for lock := range m.locks {
+		if lock.From == id && exits[lock.Dir] != lock.To {
+			delete(m.locks, lock)
+		}
+	}
+	m.refreshLockedAdjacencies()
 }
 
 func (m *Mapper) placeFrom(room, anchor *Room, dir string) error {

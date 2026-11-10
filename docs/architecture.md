@@ -196,12 +196,16 @@ server's GMCP Telnet offer and separates subnegotiation frames from transcript
 text. WEG decodes ANSI foreground colors and recognizes password prompts. WCS
 displays the colored transcript and masks input during password prompts.
 
-Live mapping loads the known topology from `Rooms/`. When GMCP is enabled, WEG
-decodes `HolyQuest.Room` messages with `id` and `name` fields. WNE uses the ID
-as the `RoomId` from `Rooms/`, and the Map Panel uses the name as its label.
-On connections without GMCP, WEG looks for a room title followed by `Exits:`.
-For title-only output, WNE uses the exits and location context to identify the
-room. Ambiguous observations leave the current position unresolved.
+WEG decodes `HolyQuest.Room` messages with an `id`, a display `name`, and an
+`exits` object that maps each outgoing direction to its destination room ID.
+WNE builds the live graph from these reports. Each `exits` object replaces the
+source room's previous outgoing edges, including when the object is empty.
+WMR drops placement constraints for edges the server removed or redirected.
+
+For older GMCP messages that omit `exits` or connections that use room text,
+WTL can load the local `Rooms/` dataset as a fallback. WNE uses the reported
+exits and location context to resolve title-only room observations. Ambiguous
+observations leave the current position unresolved.
 
 WNE tracks confirmed visits independently of layout placement. WMR projects
 the discovered rooms and publishes a snapshot for the Win32 Map Panel. WCS

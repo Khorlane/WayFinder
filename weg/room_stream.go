@@ -8,10 +8,11 @@ import (
 )
 
 type RoomEntry struct {
-	ID        wne.RoomID
-	Name      string
-	Exits     map[string]struct{}
-	Direction string
+	ID           wne.RoomID
+	Name         string
+	Exits        map[string]struct{}
+	Destinations map[string]wne.RoomID // nil when the server omitted topology
+	Direction    string
 }
 
 var (

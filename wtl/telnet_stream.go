@@ -120,10 +120,13 @@ func (s *telnetStream) consume(chunk []byte) error {
 					if err := s.flushText(); err != nil {
 						return err
 					}
-					if id := s.gateway.ReceiveGMCP(s.subData); id != "" {
-						s.tracef("RX HolyQuest.Room id=%q", id)
+					room := s.gateway.ReceiveGMCP(s.subData)
+					if room.ID == "" {
+						s.tracef("Ignored GMCP payload (%d bytes, no valid HolyQuest.Room event)", len(s.subData))
+					} else if room.Destinations == nil {
+						s.tracef("RX HolyQuest.Room id=%q (no exit destinations supplied)", room.ID)
 					} else {
-						s.tracef("Ignored GMCP payload (%d bytes, no valid HolyQuest.Room ID)", len(s.subData))
+						s.tracef("RX HolyQuest.Room id=%q exits=%d", room.ID, len(room.Destinations))
 					}
 				}
 				s.state = readText

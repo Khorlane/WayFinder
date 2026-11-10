@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"WayFinder/weg"
@@ -117,29 +118,35 @@ func openGMCPLog() (*log.Logger, func()) {
 }
 
 func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string, error)) {
-	path := "Rooms"
-	if exe, err := os.Executable(); err == nil {
-		besideExe := filepath.Join(filepath.Dir(exe), path)
-		if _, err := os.Stat(besideExe); !os.IsNotExist(err) {
-			path = besideExe
-		}
-	}
-	world, err := LoadWorld(path)
-	if err != nil {
-		showMap(wmr.Layout{}, "", fmt.Errorf("Could not load Rooms/ for the map (%w)", err))
-		return
-	}
-	if len(world.exits) == 0 {
-		showMap(wmr.Layout{}, "", fmt.Errorf("No room files found in %s", path))
-		return
-	}
 	discovery := NewDiscoveryState()
-	worldView := wneWorldAdapter{w: world}
-	navigation := wne.NewLiveNavigation(worldView, wneDiscoveryAdapter{d: discovery})
+	navigation := wne.NewLiveNavigation(nil, wneDiscoveryAdapter{d: discovery})
 	mapper := wmr.NewMapper()
-	mapper.BindTopology(world)
+	mapper.BindTopology(wneTopologyAdapter{t: navigation})
+
+	loadFallback := sync.OnceValue(func() error {
+		world, err := loadLiveWorld()
+		if err == nil {
+			navigation.SetFallbackWorld(wneWorldAdapter{w: world})
+		}
+		return err
+	})
+	fallbackNoticeShown := false
 	gateway.OnRoomEntry(func(room weg.RoomEntry) {
 		roomID := room.ID
+		if room.Destinations != nil {
+			if navigation.RecordExits(roomID, room.Destinations) {
+				mapper.RefreshRoomExits(fromWNERoomID(roomID))
+			}
+		} else if roomID == "" || !navigation.HasRoom(roomID) {
+			if err := loadFallback(); err != nil {
+				if roomID != "" {
+					navigation.ObserveRoom(roomID)
+				}
+				showMap(mapper.SnapshotLayout(discovery, ""), room.Name, err)
+				fallbackNoticeShown = true
+				return
+			}
+		}
 		if roomID == "" {
 			var err error
 			roomID, err = navigation.ResolveRoom(room.Name, room.Exits, room.Direction)
@@ -158,5 +165,32 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 			err = fmt.Errorf("Room %s is missing from Rooms/", id)
 		}
 		showMap(mapper.SnapshotLayout(discovery, id), room.Name, err)
-	}, func(name string) bool { return len(worldView.RoomsNamed(name)) > 0 })
+	}, func(name string) bool {
+		if err := loadFallback(); err != nil {
+			if !fallbackNoticeShown {
+				showMap(mapper.SnapshotLayout(discovery, ""), "", err)
+				fallbackNoticeShown = true
+			}
+			return false
+		}
+		return len(navigation.RoomsNamed(name)) > 0
+	})
+}
+
+func loadLiveWorld() (*World, error) {
+	path := "Rooms"
+	if exe, err := os.Executable(); err == nil {
+		besideExe := filepath.Join(filepath.Dir(exe), path)
+		if _, err := os.Stat(besideExe); !os.IsNotExist(err) {
+			path = besideExe
+		}
+	}
+	world, err := LoadWorld(path)
+	if err != nil {
+		return nil, fmt.Errorf("Could not load Rooms/ for legacy mapping (%w)", err)
+	}
+	if len(world.exits) == 0 {
+		return nil, fmt.Errorf("No room files found in %s", path)
+	}
+	return world, nil
 }

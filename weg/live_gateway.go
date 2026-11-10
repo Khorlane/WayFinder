@@ -24,6 +24,7 @@ type LiveGateway struct {
 	rooms            roomStream
 	gmcpEnabled      bool
 	gotGMCPRoom      bool
+	gotGMCPExits     bool
 	commandMu        sync.Mutex
 	gameStarted      bool
 	pendingCommands  int

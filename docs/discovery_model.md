@@ -14,11 +14,14 @@ Two structures represent truth:
 
 ### World Topology
 
-The full graph of rooms and exits.
+The graph of known rooms and directed exits.
 
     roomID → direction → neighborRoomID
 
-This is immutable after loading.
+The simulator loads the full graph from its room files. In live play the graph
+grows from HolyQuest's room reports. Each report with exit destinations supplies
+the complete outgoing edges of that room. A destination ID in an exit does not
+mark the destination discovered.
 
 ------------------------------------------------------------------------
 
