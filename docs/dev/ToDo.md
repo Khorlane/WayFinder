@@ -1,12 +1,11 @@
-# ToDo
+# WayFinder backlog
 
-- [ ] WF-001 Add a minimal runtime switch to use either current local world navigation (existing proven flow) or a live telnet connection to `www.holyquest.org:7373` via `github.com/reiver/go-telnet`.
-- [ ] WF-002 When the temporary `Rooms/` dataset is no longer needed, remove the entire `Rooms/` folder from the project.
-- [x] WF-003 Reduce `main.go` scope by extracting mapper core, world loading, and CLI harness into focused internal packages; keep `main.go` as bootstrap/composition wiring only. (commit: a5f7625)
-- [x] WF-004 Refactor package/folder layout to architecture-aligned top-level subsystems (`wcs/`, `wne/`, `wmr/`, `solver/`) and remove temporary `internal/harness` naming. (commit: f616a65)
-- [x] WF-005 Local dev harness now emits simulated HolyQuest-style room output after room entry and movement attempts, while still showing the discovered-room map with `@` for current room. (commit: 6f9ce48)
-- [x] WF-006 Refactor `wmr/runtime.go` to isolate the local/dev harness: move `Run`, `LoadWorld`, `parseRoomFileIntoWorld`, and other local-mode helpers into `wmr/local_mode.go`, leaving `runtime.go` responsible only for mapper/runtime behavior. Simulated HolyQuest-style output in `local_mud_output.go` must remain unchanged. (commit: 3809f64)
-- [x] WF-007 ToDo/maintenance hygiene: corrected WF-005 commit tag and added `docs/dev/MAINTENANCE.md` guidance for updating `(commit: pending|TBD)` to exact commit hashes when closing WF items. (commit: f819d22)
-- [x] WF-008 Upgrade `docs/dev/scripts/generate_go_source_index.go` to prepend a full repository tree section to `docs/dev/go_source_index.md`, excluding full `Rooms/` expansion by showing only first and last room files (sorted) plus a summarized count. (commit: 6c2a4ce)
-- [x] WF-009 Move `solver/solver.go` to `wmr/solver.go` to reduce top-level package clutter, while preserving the `SolverEngine` interface boundary and current behavior/tests. (commit: 4ff7746)
-- [x] WF-010 Isolate MUD input boundary: enforce WTL as the only information source and support two operating modes (Simulated MUD development harness and future Live MUD connectivity). Ensure both modes produce identical MUD text flowing through the pipeline WTL → WEG → WNE → WMR → WCS. (commit: 0df386b, 9a31b9b, 1fbd6a1)
+- [ ] **WF-001** Evaluate whether the live client needs Telnet negotiation beyond the current TCP text session. The live connection and mode selection shipped in `3d670a7`.
+- [ ] **WF-002** Retire the local `Rooms/` dataset once the simulator no longer needs it.
+
+## Live mapping
+
+- [ ] Have WEG recognize room entries and exits in [HolyQuest output](examples/holyquest-room-output.txt), then send navigation events to WNE.
+- [ ] Display WMR's discovered-room layout in the Win32 Map Panel.
+
+Record the implementation commit when closing a `WF-*` item. Earlier completed items are in `git show 96b2e26:docs/dev/ToDo.md`.

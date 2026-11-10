@@ -53,7 +53,7 @@ Read these files first when relevant:
 - `docs/architecture.md`
 - `docs/discovery_model.md`
 - `docs/mapper_rules.md`
-- `docs/dev/llm_context.txt`
+- `docs/dev/CONTEXT.md`
 
 ## Validation
 

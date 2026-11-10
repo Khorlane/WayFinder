@@ -1,219 +1,35 @@
 # WayFinder
 
-[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)]()
-[![Status](https://img.shields.io/badge/status-active%20development-yellow)]()
-[![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://unlicense.org/)
+WayFinder is a native Windows client for the HolyQuest MUD.
 
-WayFinder is a MUD client with an integrated navigation system designed for a **specific known world**.
+## Quick start
 
-The system builds a readable spatial map of the world **as the player explores**, maintaining a clear projection of discovered rooms while preserving directional relationships.
-
-WayFinder separates:
-
-- **World topology** — authoritative room/exit structure
-- **Discovery state** — rooms the player has encountered
-- **Map projection** — a readable spatial layout generated from discovered rooms
-
-The map layout is a **projection**, not authoritative. It may rebuild as exploration continues.
-
-## Connect to the live game
-
-Open `WayFinder.exe` to connect to HolyQuest at `129.212.241.43:7373`.
-The game transcript appears in the Output View with ANSI foreground colors.
-Type in the Input Console and press Enter to send each response or command.
-Use Up and Down to recall commands from the current session.
-Close the window to disconnect.
-
-To rebuild the Windows executable, run the following command from the project directory.
+To build from source, use Windows and Go 1.23.4 or later. Run these commands
+from the project directory.
 
 ```powershell
 go build -ldflags=-H=windowsgui -o WayFinder.exe .
+.\WayFinder.exe
 ```
 
-From source, `go run .` opens the same window. Use `go run . --play <host:port>`
-to choose a different server or `go run . --live <host:port>` for a read-only
-terminal connection. For local simulation, run `go run . .\Rooms`.
+WayFinder connects to HolyQuest at `129.212.241.43:7373` and displays the color
+transcript in the Output View. Type in the Input Console and press **Enter** to
+send a command. Use **Up** and **Down** to recall commands from the current
+session. Close the window to disconnect.
 
----
+## Other ways to run
 
-# Architecture
+- `go run .` opens the live Windows client from source.
+- `go run . --play <host:port>` opens the client and connects to a different server.
+- `go run . --live <host:port>` streams server output to the terminal in read-only mode.
+- `go run . .\Rooms` runs the local simulator with a room dataset in `Rooms/`.
 
-## Runtime Pipeline
+## Project documentation
 
-```mermaid
-flowchart LR
-
-MUD[Live MUD Server]
-
-WCS[WayFinder Client Shell]
-WEG[WayFinder Event Gateway]
-WNE[WayFinder Navigation Engine]
-WMR[WayFinder Mapping Runtime]
-WMP[WayFinder Map Panel]
-
-MUD --> WTL
-WTL --> WEG
-WEG --> WNE
-WNE --> WMR
-WMR --> WCS
-WCS --> WMP
-```
-
-Pipeline shorthand:
-
-```
-WTL → WEG → WNE → WMR → WCS
-```
-
----
-
-## Component Model
-
-```mermaid
-flowchart TB
-
-WF[WayFinder]
-
-WCS[Client Shell]
-WEG[Event Gateway]
-WNE[Navigation Engine]
-WMR[Mapping Runtime]
-WMP[Map Panel]
-
-WF --> WCS
-WF --> WEG
-WF --> WNE
-WF --> WMR
-WCS --> WMP
-```
-
-### Responsibilities
-
-| Component | Responsibility |
-|---|---|
-| **WTL** | Raw text transport source |
-| **WEG** | Convert raw MUD text into structured WayFinder events |
-| **WNE** | Maintain the player’s discovered navigation state |
-| **WMR** | Compute the map layout from WNE’s discovered topology |
-| **WCS** | User-facing shell and orchestration surface |
-| **WMP** | Draw the map from WMR’s layout inside WCS |
-
----
-
-# Discovery → Layout → Rebuild
-
-```mermaid
-flowchart TD
-
-A[Player enters room] --> B[WEG emits EnterRoom]
-B --> C[WNE marks room discovered]
-C --> D{Room already placed?}
-
-D -- Yes --> E[Validate ordering constraints]
-E --> F{Still valid?}
-
-F -- Yes --> G[Keep layout]
-F -- No --> H[Rebuild layout]
-
-D -- No --> I[Add room to discovered set]
-I --> J[Attempt incremental placement]
-
-J --> K{Placement valid?}
-K -- Yes --> G
-K -- No --> H
-
-H --> L[Recompute layout from discovered graph]
-L --> M[Apply ordering rules]
-M --> N[Allow spacing gaps]
-N --> O[Prevent insertion between locked pairs]
-O --> P[Produce new projection]
-
-G --> Q[Map panel draws layout]
-P --> Q
-```
-
-**Key principle**
-
-World topology and discovery are authoritative.  
-The grid layout is a **rebuildable projection**.
-
----
-
-# Navigation Model
-
-WayFinder maps only the **discovered portion of the world**.
-
-Rules:
-
-- A room becomes discovered when the player enters it
-- If a room is discovered, its exits are known
-- Undiscovered rooms are not placed on the map
-- Layout may rebuild when conflicts appear
-
----
-
-# Spatial Layout Rules
-
-WayFinder uses **ordered directional constraints**, not rigid one-cell geometry.
-
-Valid relationships include spacing between rooms.
-
-Vertical example:
-
-```
-A
-.
-B
-```
-
-Horizontal example:
-
-```
-A ... B
-```
-
-Constraints:
-
-- Directional ordering must remain correct
-- Gaps are allowed
-- No room may appear between locked ordered pairs
-
----
-
-# Repository Structure
-
-```
-main.go              application entry point
-
-wcs  WayFinder Client Shell
-weg  WayFinder Event Gateway
-wne  WayFinder Navigation Engine
-wmr  WayFinder Mapping Runtime
-wtl  WayFinder Telnet Layer
-
-docs/                detailed architecture documentation
-```
-
-Detailed design documentation:
-
-```
-docs/architecture.md
-docs/discovery_model.md
-docs/mapper_rules.md
-```
-
----
-
-# Project Status
-
-WayFinder is under active development.
-
-The navigation engine and discovery model are implemented and being integrated with the client shell and GUI.
+- [Architecture](docs/architecture.md)
+- [Discovery model](docs/discovery_model.md)
+- [Mapper rules](docs/mapper_rules.md)
 
 ## License
 
-WayFinder is released under **The Unlicense**.
-
-Third-party dependencies retain their own licenses:
-
-- github.com/reiver/go-telnet — MIT
+[The Unlicense](LICENSE)
