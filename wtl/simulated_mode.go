@@ -58,6 +58,7 @@ func setupLogging(logPath string) (func(), error) {
 type World struct {
 	exits     map[wmr.RoomID]map[string]wmr.RoomID // room -> dir -> neighbor
 	neighbors map[wmr.RoomID]map[wmr.RoomID]struct{}
+	roomNames map[string][]wne.RoomID
 }
 
 func (w *World) ExitsFrom(roomID wmr.RoomID) map[string]wmr.RoomID {
@@ -196,6 +197,10 @@ func (a wneWorldAdapter) HasRoom(roomID wne.RoomID) bool {
 	return a.w.HasRoom(fromWNERoomID(roomID))
 }
 
+func (a wneWorldAdapter) RoomsNamed(name string) []wne.RoomID {
+	return a.w.roomNames[strings.ToLower(strings.TrimSpace(name))]
+}
+
 type wneMapperAdapter struct {
 	m *wmr.Mapper
 }
@@ -229,6 +234,7 @@ func LoadWorld(path string) (*World, error) {
 	w := &World{
 		exits:     make(map[wmr.RoomID]map[string]wmr.RoomID),
 		neighbors: make(map[wmr.RoomID]map[wmr.RoomID]struct{}),
+		roomNames: make(map[string][]wne.RoomID),
 	}
 
 	entries, err := os.ReadDir(path)
@@ -261,6 +267,7 @@ func parseRoomFileIntoWorld(w *World, filePath string) error {
 	defer f.Close()
 
 	var roomID wmr.RoomID
+	var roomName string
 	var curExitName string
 	var curExitTo wmr.RoomID
 
@@ -293,6 +300,10 @@ func parseRoomFileIntoWorld(w *World, filePath string) error {
 
 		if strings.HasPrefix(line, "RoomId:") {
 			roomID = wmr.RoomID(strings.TrimSpace(strings.TrimPrefix(line, "RoomId:")))
+			continue
+		}
+		if strings.HasPrefix(line, "RoomName:") {
+			roomName = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, "RoomName:")))
 			continue
 		}
 
@@ -330,6 +341,9 @@ func parseRoomFileIntoWorld(w *World, filePath string) error {
 		return fmt.Errorf("%s: missing RoomId:", filePath)
 	}
 	w.ensureRoom(roomID)
+	if roomName != "" {
+		w.roomNames[roomName] = append(w.roomNames[roomName], toWNERoomID(roomID))
+	}
 	return nil
 }
 

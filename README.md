@@ -17,6 +17,11 @@ transcript in the Output View. Type in the Input Console and press **Enter** to
 send a command. Use **Up** and **Down** to recall commands from the current
 session. Close the window to disconnect.
 
+Place the HolyQuest `Rooms/` dataset beside `WayFinder.exe` or in the working
+directory to enable the Map Panel. The panel reveals rooms as you visit them
+and highlights your current location. When HolyQuest enables GMCP, the panel
+uses the room IDs sent by the server.
+
 ## Other ways to run
 
 - `go run .` opens the live Windows client from source.

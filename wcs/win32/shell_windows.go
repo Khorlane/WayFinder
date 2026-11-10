@@ -198,6 +198,14 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 	case wmSize:
 		layoutPanels(hwnd)
 		return 0
+	case wmDrawItem:
+		if liveWindow != nil && lParam != 0 {
+			item := (*drawItem)(unsafe.Pointer(lParam))
+			if item.window == hWMP {
+				liveWindow.mapView.draw(item.dc, item.bounds, liveWindow.gmcpStatus)
+				return 1
+			}
+		}
 	case wmTimer:
 		if liveWindow != nil && wParam == liveTimer {
 			liveWindow.drainUpdates()

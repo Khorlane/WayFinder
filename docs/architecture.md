@@ -191,17 +191,21 @@ Primary implementation files:
 
 ## Live Mode
 
-WTL owns the TCP connection and sends commands captured by WCS. WEG decodes ANSI
-foreground colors and recognizes password prompts in the incoming stream. WCS
+WTL owns the TCP connection and sends commands captured by WCS. It accepts the
+server's GMCP Telnet offer and separates subnegotiation frames from transcript
+text. WEG decodes ANSI foreground colors and recognizes password prompts. WCS
 displays the colored transcript and masks input during password prompts.
-The live text session starts without a navigation session or map projection.
 
-Planned integration library:
+Live mapping loads the known topology from `Rooms/`. When GMCP is enabled, WEG
+decodes `HolyQuest.Room` messages with `id` and `name` fields. WNE uses the ID
+as the `RoomId` from `Rooms/`, and the Map Panel uses the name as its label.
+On connections without GMCP, WEG looks for a room title followed by `Exits:`.
+For title-only output, WNE uses the exits and location context to identify the
+room. Ambiguous observations leave the current position unresolved.
 
-- `github.com/reiver/go-telnet`
-
-When live mapping is added, WEG emits navigation events for WNE, and WMR computes
-the map layout for WCS.
+WNE tracks confirmed visits independently of layout placement. WMR projects
+the discovered rooms and publishes a snapshot for the Win32 Map Panel. WCS
+keeps the transcript and command console available if map data cannot be loaded.
 
 ---
 
@@ -229,10 +233,10 @@ Current state at a high level:
 - solver implemented
 - navigation session implemented
 - local development harness implemented
-- telnet integration not yet complete
-- WEG parser not yet complete
+- WTL negotiates GMCP
+- WEG decodes `HolyQuest.Room` events and recognizes text room blocks on connections without GMCP
 - WCS live transcript and command entry implemented
-- WMP map rendering not yet complete
+- WMP displays the live discovered layout and highlights the current room
 
 This architecture document describes the intended structure that current and
 future work should follow.

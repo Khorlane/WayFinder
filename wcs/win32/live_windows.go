@@ -6,6 +6,7 @@ import (
 	"unsafe"
 
 	"WayFinder/weg"
+	"WayFinder/wmr"
 )
 
 const (
@@ -50,10 +51,11 @@ const (
 	maxCommandHistory = 100
 )
 
-type livePlayer func(context.Context, string, <-chan string, func(weg.LiveText), func()) error
+type livePlayer func(context.Context, string, <-chan string, func(weg.LiveText), func(wmr.Layout, string, error), func()) error
 
 type liveUpdate struct {
 	text         weg.LiveText
+	mapView      *liveMapView
 	status       string
 	connected    bool
 	disconnected bool
@@ -69,6 +71,8 @@ type liveShell struct {
 	history      []string
 	historyIndex int
 	commandDraft string
+	mapView      liveMapView
+	gmcpStatus   string
 }
 
 var liveWindow *liveShell
@@ -99,11 +103,12 @@ func RunLiveWCS(address string, play livePlayer) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	liveWindow = &liveShell{
-		ctx:      ctx,
-		address:  address,
-		play:     play,
-		commands: make(chan string, 16),
-		updates:  make(chan liveUpdate, 32),
+		ctx:        ctx,
+		address:    address,
+		play:       play,
+		commands:   make(chan string, 16),
+		updates:    make(chan liveUpdate, 32),
+		gmcpStatus: weg.GMCPWaitingStatus,
 	}
 	defer func() { liveWindow = nil }()
 	RunWCS()
@@ -121,7 +126,8 @@ func createLivePanels(parent uintptr) {
 	hWOV = createWindowEx(0, transcriptClass, empty, baseStyle|wsVScroll|esMultiline|esAutoVScroll|esReadOnly, 0, 0, 0, 0, parent, 0, instance, 0)
 	hWIC = createWindowEx(0, editClass, empty, baseStyle|wsDisabled|esAutoHScroll, 0, 0, 0, 0, parent, 0, instance, 0)
 	hWICLbl = createWindowEx(0, syscall.StringToUTF16Ptr("STATIC"), syscall.StringToUTF16Ptr("Command (Enter to send)"), wsChild|wsVisible, 0, 0, 0, 0, parent, 0, instance, 0)
-	if hWOV == 0 || hWIC == 0 || hWICLbl == 0 {
+	hWMP = createWindowEx(0, syscall.StringToUTF16Ptr("STATIC"), syscall.StringToUTF16Ptr("WayFinder Map Panel"), baseStyle|ssOwnerDraw, 0, 0, 0, 0, parent, 0, instance, 0)
+	if hWOV == 0 || hWIC == 0 || hWICLbl == 0 || hWMP == 0 {
 		panic("Could not create live game controls")
 	}
 	font, _, _ := procGetStockObject.Call(ansiFixedFont)
@@ -144,7 +150,10 @@ func layoutLivePanels(hwnd uintptr) {
 	width := client.Right - client.Left - 2*margin
 	inputTop := client.Bottom - client.Top - margin - inputHeight
 	labelTop := inputTop - labelHeight
-	moveWindow(hWOV, margin, margin, width, labelTop-2*margin)
+	mapWidth := width / 3
+	outputWidth := width - mapWidth - margin
+	moveWindow(hWOV, margin, margin, outputWidth, labelTop-2*margin)
+	moveWindow(hWMP, margin+outputWidth+margin, margin, mapWidth, labelTop-2*margin)
 	moveWindow(hWICLbl, margin, labelTop, width, labelHeight)
 	moveWindow(hWIC, margin, inputTop, width, inputHeight)
 }
@@ -158,6 +167,8 @@ func (s *liveShell) start(hwnd uintptr) {
 	go func() {
 		err := s.play(s.ctx, s.address, s.commands, func(text weg.LiveText) {
 			s.postUpdate(liveUpdate{text: text})
+		}, func(layout wmr.Layout, title string, err error) {
+			s.postUpdate(liveUpdate{mapView: &liveMapView{layout: layout, title: title, err: err}})
 		}, func() {
 			s.postUpdate(liveUpdate{connected: true})
 		})
@@ -181,6 +192,14 @@ func (s *liveShell) drainUpdates() {
 		select {
 		case update := <-s.updates:
 			appendTranscript(update.text.Spans...)
+			if update.text.GMCPStatus != "" {
+				s.gmcpStatus = update.text.GMCPStatus
+				procInvalidateRect.Call(hWMP, 0, 0)
+			}
+			if update.mapView != nil {
+				s.mapView = *update.mapView
+				procInvalidateRect.Call(hWMP, 0, 0)
+			}
 			if update.connected {
 				procEnableWindow.Call(hWIC, 1)
 				procSetFocus.Call(hWIC)
@@ -190,7 +209,7 @@ func (s *liveShell) drainUpdates() {
 				procEnableWindow.Call(hWIC, 0)
 				setWindowText(hWIC, "")
 			}
-			if s.masked != update.text.MaskInput {
+			if len(update.text.Spans) > 0 && s.masked != update.text.MaskInput {
 				s.masked = update.text.MaskInput
 				var mask uintptr
 				if s.masked {
