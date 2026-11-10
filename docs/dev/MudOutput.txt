@@ -21,7 +21,7 @@ Name?
 ixaka
 
 Password?
-aixaka4u
+<not show>
 
 Message of the Day
 
