@@ -41,10 +41,13 @@ const (
 	unicodeCodePage = 1200
 
 	vkReturn          = 0x0D
+	vkUp              = 0x26
+	vkDown            = 0x28
 	sbBottom          = 7
 	ansiFixedFont     = 11
 	liveTimer         = 1
 	maxTranscriptSize = 128 * 1024
+	maxCommandHistory = 100
 )
 
 type livePlayer func(context.Context, string, <-chan string, func(weg.LiveText), func()) error
@@ -57,12 +60,15 @@ type liveUpdate struct {
 }
 
 type liveShell struct {
-	ctx      context.Context
-	address  string
-	play     livePlayer
-	commands chan string
-	updates  chan liveUpdate
-	masked   bool
+	ctx          context.Context
+	address      string
+	play         livePlayer
+	commands     chan string
+	updates      chan liveUpdate
+	masked       bool
+	history      []string
+	historyIndex int
+	commandDraft string
 }
 
 var liveWindow *liveShell
@@ -199,19 +205,50 @@ func (s *liveShell) drainUpdates() {
 }
 
 func (s *liveShell) submitCommand() {
-	length, _, _ := procSendMessageW.Call(hWIC, wmGetTextLength, 0, 0)
-	buffer := make([]uint16, length+1)
-	procSendMessageW.Call(hWIC, wmGetText, uintptr(len(buffer)), uintptr(unsafe.Pointer(&buffer[0])))
-	command := syscall.UTF16ToString(buffer)
+	command := commandText()
 	select {
 	case s.commands <- command:
 		setWindowText(hWIC, "")
+		if !s.masked && command != "" {
+			if len(s.history) == maxCommandHistory {
+				copy(s.history, s.history[1:])
+				s.history = s.history[:maxCommandHistory-1]
+			}
+			s.history = append(s.history, command)
+		}
+		s.historyIndex = len(s.history)
+		s.commandDraft = ""
 		if !s.masked {
 			appendTranscript(weg.LiveSpan{Text: command + "\r\n"})
 		}
 	default:
 		appendTranscript(weg.LiveSpan{Text: "\r\nCommand queue is busy. Press Enter again to retry.\r\n"})
 	}
+}
+
+func (s *liveShell) recallCommand(step int) {
+	next := s.historyIndex + step
+	if s.masked || next < 0 || next > len(s.history) {
+		return
+	}
+	if s.historyIndex == len(s.history) {
+		s.commandDraft = commandText()
+	}
+	s.historyIndex = next
+	text := s.commandDraft
+	if next < len(s.history) {
+		text = s.history[next]
+	}
+	setWindowText(hWIC, text)
+	length, _, _ := procSendMessageW.Call(hWIC, wmGetTextLength, 0, 0)
+	procSendMessageW.Call(hWIC, emSetSel, length, length)
+}
+
+func commandText() string {
+	length, _, _ := procSendMessageW.Call(hWIC, wmGetTextLength, 0, 0)
+	buffer := make([]uint16, length+1)
+	procSendMessageW.Call(hWIC, wmGetText, uintptr(len(buffer)), uintptr(unsafe.Pointer(&buffer[0])))
+	return syscall.UTF16ToString(buffer)
 }
 
 func appendTranscript(spans ...weg.LiveSpan) {

@@ -167,9 +167,18 @@ func RunWCS() {
 		if ret == 0 {
 			break
 		}
-		if liveWindow != nil && m.HWnd == hWIC && m.Message == wmKeyDown && m.WParam == vkReturn {
-			liveWindow.submitCommand()
-			continue
+		if liveWindow != nil && m.HWnd == hWIC && m.Message == wmKeyDown {
+			switch m.WParam {
+			case vkReturn:
+				liveWindow.submitCommand()
+				continue
+			case vkUp:
+				liveWindow.recallCommand(-1)
+				continue
+			case vkDown:
+				liveWindow.recallCommand(1)
+				continue
+			}
 		}
 		procTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
 		procDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))

@@ -21,6 +21,7 @@ The map layout is a **projection**, not authoritative. It may rebuild as explora
 Open `WayFinder.exe` to connect to HolyQuest at `129.212.241.43:7373`.
 The game transcript appears in the Output View with ANSI foreground colors.
 Type in the Input Console and press Enter to send each response or command.
+Use Up and Down to recall commands from the current session.
 Close the window to disconnect.
 
 To rebuild the Windows executable, run the following command from the project directory.
