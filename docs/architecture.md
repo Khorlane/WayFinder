@@ -191,15 +191,17 @@ Primary implementation files:
 
 ## Live Mode
 
-Real MUD connection via telnet.
+WTL owns the TCP connection and sends commands captured by WCS. WEG recognizes
+password prompts in the incoming stream. WCS displays the transcript in the
+Output View and masks input in the Input Console during password prompts.
+The live text session starts without a navigation session or map projection.
 
 Planned integration library:
 
 - `github.com/reiver/go-telnet`
 
-Live mode should preserve the same architectural split:
-WCS handles UI, WEG parses text, WNE manages navigation state, and WMR manages
-map layout.
+When live mapping is added, WEG emits navigation events for WNE, and WMR computes
+the map layout for WCS.
 
 ---
 
@@ -229,7 +231,7 @@ Current state at a high level:
 - local development harness implemented
 - telnet integration not yet complete
 - WEG parser not yet complete
-- WCS event wiring not yet complete
+- WCS live transcript and command entry implemented
 - WMP map rendering not yet complete
 
 This architecture document describes the intended structure that current and

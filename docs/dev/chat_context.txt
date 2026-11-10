@@ -68,15 +68,18 @@ WayFinder/
 ├── wcs/
 │   ├── telnet/   (currently empty placeholder)
 │   └── win32/
+│       ├── live_windows.go
 │       ├── proc_windows.go
 │       └── shell_windows.go
 ├── weg/
+│   ├── live_gateway.go
 │   └── simulated_gateway.go
 ├── wmr/
 │   ├── dev_view.go
 │   ├── runtime.go
 │   └── solver.go
 ├── wtl/
+│   ├── live_mode.go
 │   └── simulated_mode.go
 ├── wne/
 │   ├── navigation_session.go
@@ -97,6 +100,8 @@ WayFinder/
 
 Current repo notes:
 - Local dev harness now lives in wtl/simulated_mode.go
+- Live mode in wtl/live_mode.go owns the TCP connection and sends commands
+- WEG recognizes password prompts and WCS hosts the live transcript and input
 - Simulated MUD output generation now lives in wtl/simulated_mode.go
 - Simulated command text is first interpreted by WEG at weg/simulated_gateway.go before WNE movement
 - Solver implementation now lives at wmr/solver.go
@@ -111,7 +116,7 @@ Navigation session: COMPLETE
 Local development harness: COMPLETE
 
 Remaining work:
-- WF-001 minimal runtime switch (local vs live telnet)
+- WF-001 Telnet protocol integration beyond the live TCP text session
 - WF-002 remove temporary Rooms/ dataset when no longer needed
 
 Recently completed:

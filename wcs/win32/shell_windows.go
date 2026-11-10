@@ -1,6 +1,7 @@
 package win32
 
 import (
+	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -57,6 +58,7 @@ type msg struct {
 	LParam  uintptr
 	Time    uint32
 	Pt      point
+	Private uint32
 }
 
 type rect struct {
@@ -95,10 +97,12 @@ var (
 // WCS handles presentation and command capture; it does not own navigation,
 // topology, or map projection rules.
 func RunWCS() {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	hInstance := getModuleHandle()
 	classNamePtr := syscall.StringToUTF16Ptr(className)
 	windowNamePtr := syscall.StringToUTF16Ptr(windowName)
-	staticClass := syscall.StringToUTF16Ptr("STATIC")
 
 	hCursor := loadSystemResource(imageCursor, idcArrow)
 
@@ -115,10 +119,14 @@ func RunWCS() {
 		panic("RegisterClassExW failed")
 	}
 
+	style := uint32(wsOverlappedWindow | wsClipSiblings | wsClipChildren)
+	if liveWindow != nil {
+		style |= wsThickFrame | wsMaximizeBox
+	}
 	clientRect := rect{Left: 0, Top: 0, Right: winW, Bottom: winH}
 	procAdjustWindowRectEx.Call(
 		uintptr(unsafe.Pointer(&clientRect)),
-		uintptr(wsOverlappedWindow),
+		uintptr(style),
 		0,
 		0,
 	)
@@ -130,7 +138,7 @@ func RunWCS() {
 		0,
 		classNamePtr,
 		windowNamePtr,
-		wsOverlappedWindow|wsClipSiblings|wsClipChildren,
+		style,
 		cwUseDefault,
 		cwUseDefault,
 		fullW,
@@ -144,10 +152,11 @@ func RunWCS() {
 		panic("CreateWindowExW failed")
 	}
 
-	_ = staticClass
-
 	procShowWindow.Call(hMainWnd, swShowDefault)
 	procUpdateWindow.Call(hMainWnd)
+	if liveWindow != nil {
+		liveWindow.start(hMainWnd)
+	}
 
 	var m msg
 	for {
@@ -158,6 +167,10 @@ func RunWCS() {
 		if ret == 0 {
 			break
 		}
+		if liveWindow != nil && m.HWnd == hWIC && m.Message == wmKeyDown && m.WParam == vkReturn {
+			liveWindow.submitCommand()
+			continue
+		}
 		procTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
 		procDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))
 	}
@@ -166,13 +179,25 @@ func RunWCS() {
 func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 	switch message {
 	case wmCreate:
-		createPanels(hwnd)
+		if liveWindow != nil {
+			createLivePanels(hwnd)
+		} else {
+			createPanels(hwnd)
+		}
 		layoutPanels(hwnd)
 		return 0
 	case wmSize:
 		layoutPanels(hwnd)
 		return 0
+	case wmTimer:
+		if liveWindow != nil && wParam == liveTimer {
+			liveWindow.drainUpdates()
+			return 0
+		}
 	case wmDestroy:
+		if liveWindow != nil {
+			procKillTimer.Call(hwnd, liveTimer)
+		}
 		procPostQuitMessage.Call(0)
 		return 0
 	}
@@ -200,6 +225,10 @@ func createPanels(parent uintptr) {
 }
 
 func layoutPanels(hwnd uintptr) {
+	if liveWindow != nil {
+		layoutLivePanels(hwnd)
+		return
+	}
 	if hWOV == 0 || hWIC == 0 || hWMP == 0 {
 		return
 	}

@@ -16,6 +16,22 @@ WayFinder separates:
 
 The map layout is a **projection**, not authoritative. It may rebuild as exploration continues.
 
+## Connect to the live game
+
+Open `WayFinder.exe` to connect to HolyQuest at `129.212.241.43:7373`.
+The game transcript appears in the Output View. Type in the Input Console and
+press Enter to send each response or command. Close the window to disconnect.
+
+To rebuild the Windows executable, run the following command from the project directory.
+
+```powershell
+go build -ldflags=-H=windowsgui -o WayFinder.exe .
+```
+
+From source, `go run .` opens the same window. Use `go run . --play <host:port>`
+to choose a different server or `go run . --live <host:port>` for a read-only
+terminal connection. For local simulation, run `go run . .\Rooms`.
+
 ---
 
 # Architecture

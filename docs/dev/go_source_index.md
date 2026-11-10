@@ -31,9 +31,11 @@ WayFinder/
 ├── wcs/
 │   ├── telnet/
 │   └── win32/
+│       ├── live_windows.go
 │       ├── proc_windows.go
 │       └── shell_windows.go
 ├── weg/
+│   ├── live_gateway.go
 │   └── simulated_gateway.go
 ├── wmr/
 │   ├── dev_view.go
@@ -43,6 +45,7 @@ WayFinder/
 │   ├── navigation_session.go
 │   └── navigation_session_test.go
 ├── wtl/
+│   ├── live_mode.go
 │   └── simulated_mode.go
 ├── .gitattributes
 ├── .gitignore
@@ -53,26 +56,24 @@ WayFinder/
 ├── main.go
 ├── README.md
 ├── WayFinder.code-workspace
-├── WayFinder.exe
-├── WayFinder_refactor_step1_codex_instructions.md
-├── WayFinder_refactor_step1_docs_task.md
-├── WayFinder_refactor_step2_codex_instructions.md
-├── WayFinder_refactor_step3_codex_instructions.md
-└── WayFinder_refactor_step4_codex_instructions.md
+└── WayFinder.exe
 ```
 
 ## Go File Tree
 
 - `docs/dev/scripts/generate_go_source_index.go`
 - `main.go`
+- `wcs/win32/live_windows.go`
 - `wcs/win32/proc_windows.go`
 - `wcs/win32/shell_windows.go`
+- `weg/live_gateway.go`
 - `weg/simulated_gateway.go`
 - `wmr/dev_view.go`
 - `wmr/runtime.go`
 - `wmr/solver.go`
 - `wne/navigation_session.go`
 - `wne/navigation_session_test.go`
+- `wtl/live_mode.go`
 - `wtl/simulated_mode.go`
 
 ## `docs/dev/scripts/generate_go_source_index.go`
@@ -103,10 +104,31 @@ Types:
 - (none)
 
 Functions:
-- main (line 11)
+- main (line 15)
 
 Variables:
 - (none)
+
+## `wcs/win32/live_windows.go`
+
+Types:
+- livePlayer (line 40)
+- liveUpdate (line 42)
+- liveShell (line 48)
+
+Functions:
+- RunLiveWCS (line 60)
+- createLivePanels (line 74)
+- layoutLivePanels (line 93)
+- start (method on *liveShell) (line 109)
+- postUpdate (method on *liveShell) (line 129)
+- drainUpdates (method on *liveShell) (line 136)
+- submitCommand (method on *liveShell) (line 163)
+- appendTranscript (line 175)
+- setWindowText (line 191)
+
+Variables:
+- liveWindow (line 57)
 
 ## `wcs/win32/proc_windows.go`
 
@@ -119,49 +141,69 @@ Functions:
 Variables:
 - user32 (line 6)
 - kernel32 (line 7)
-- procAdjustWindowRectEx (line 9)
-- procCreateWindowExW (line 10)
-- procDefWindowProcW (line 11)
-- procDestroyWindow (line 12)
-- procDispatchMessageW (line 13)
-- procGetClientRect (line 14)
-- procGetMessageW (line 15)
-- procLoadImageW (line 16)
-- procMoveWindow (line 17)
-- procPostQuitMessage (line 18)
-- procRegisterClassExW (line 19)
-- procShowWindow (line 20)
-- procTranslateMessage (line 21)
-- procUpdateWindow (line 22)
-- procGetModuleHandleW (line 24)
+- gdi32 (line 8)
+- procAdjustWindowRectEx (line 10)
+- procCreateWindowExW (line 11)
+- procDefWindowProcW (line 12)
+- procDestroyWindow (line 13)
+- procDispatchMessageW (line 14)
+- procEnableWindow (line 15)
+- procGetClientRect (line 16)
+- procGetMessageW (line 17)
+- procKillTimer (line 18)
+- procLoadImageW (line 19)
+- procMoveWindow (line 20)
+- procPostQuitMessage (line 21)
+- procRegisterClassExW (line 22)
+- procSendMessageW (line 23)
+- procSetFocus (line 24)
+- procSetTimer (line 25)
+- procShowWindow (line 26)
+- procTranslateMessage (line 27)
+- procUpdateWindow (line 28)
+- procGetModuleHandleW (line 30)
+- procGetStockObject (line 31)
 
 ## `wcs/win32/shell_windows.go`
 
 Types:
-- point (line 48)
-- msg (line 53)
-- rect (line 62)
-- wndClassEx (line 69)
+- point (line 49)
+- msg (line 54)
+- rect (line 64)
+- wndClassEx (line 71)
 
 Functions:
-- RunWCS (line 97)
-- wndProc (line 166)
-- createPanels (line 184)
-- layoutPanels (line 202)
-- moveWindow (line 244)
-- createWindowEx (line 254)
-- getModuleHandle (line 272)
-- loadSystemResource (line 280)
-- init (line 295)
+- RunWCS (line 99)
+- wndProc (line 179)
+- createPanels (line 209)
+- layoutPanels (line 227)
+- moveWindow (line 273)
+- createWindowEx (line 283)
+- getModuleHandle (line 301)
+- loadSystemResource (line 309)
+- init (line 324)
 
 Variables:
-- hMainWnd (line 85)
-- hWOV (line 86)
-- hWIC (line 87)
-- hWMP (line 88)
-- hWOVLbl (line 89)
-- hWICLbl (line 90)
-- hWMPLbl (line 91)
+- hMainWnd (line 87)
+- hWOV (line 88)
+- hWIC (line 89)
+- hWMP (line 90)
+- hWOVLbl (line 91)
+- hWICLbl (line 92)
+- hWMPLbl (line 93)
+
+## `weg/live_gateway.go`
+
+Types:
+- LiveText (line 9)
+- LiveGateway (line 15)
+
+Functions:
+- NewLiveGateway (line 21)
+- Write (method on *LiveGateway) (line 25)
+
+Variables:
+- (none)
 
 ## `weg/simulated_gateway.go`
 
@@ -333,6 +375,18 @@ Functions:
 - buildWorld (line 59)
 - TestNavigationSessionStartAndMove (line 69)
 - TestNavigationSessionNoExit (line 96)
+
+Variables:
+- (none)
+
+## `wtl/live_mode.go`
+
+Types:
+- (none)
+
+Functions:
+- StreamLiveOutput (line 16)
+- PlayLive (line 30)
 
 Variables:
 - (none)
