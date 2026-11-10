@@ -25,8 +25,8 @@ const (
 	wmSetFont       = 0x0030
 	wmKeyDown       = 0x0100
 	wmTimer         = 0x0113
+	wmVScroll       = 0x0115
 	emSetSel        = 0x00B1
-	emScrollCaret   = 0x00B7
 	emReplaceSel    = 0x00C2
 	emSetLimitText  = 0x00C5
 	emSetReadOnly   = 0x00CF
@@ -41,6 +41,7 @@ const (
 	unicodeCodePage = 1200
 
 	vkReturn          = 0x0D
+	sbBottom          = 7
 	ansiFixedFont     = 11
 	liveTimer         = 1
 	maxTranscriptSize = 128 * 1024
@@ -201,9 +202,13 @@ func (s *liveShell) submitCommand() {
 	length, _, _ := procSendMessageW.Call(hWIC, wmGetTextLength, 0, 0)
 	buffer := make([]uint16, length+1)
 	procSendMessageW.Call(hWIC, wmGetText, uintptr(len(buffer)), uintptr(unsafe.Pointer(&buffer[0])))
+	command := syscall.UTF16ToString(buffer)
 	select {
-	case s.commands <- syscall.UTF16ToString(buffer):
+	case s.commands <- command:
 		setWindowText(hWIC, "")
+		if !s.masked {
+			appendTranscript(weg.LiveSpan{Text: command + "\r\n"})
+		}
 	default:
 		appendTranscript(weg.LiveSpan{Text: "\r\nCommand queue is busy. Press Enter again to retry.\r\n"})
 	}
@@ -232,7 +237,7 @@ func appendTranscript(spans ...weg.LiveSpan) {
 		procSendMessageW.Call(hWOV, emReplaceSel, 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(span.Text))))
 	}
 	procSendMessageW.Call(hWOV, emSetReadOnly, 1, 0)
-	procSendMessageW.Call(hWOV, emScrollCaret, 0, 0)
+	procSendMessageW.Call(hWOV, wmVScroll, sbBottom, 0)
 }
 
 func setWindowText(hwnd uintptr, text string) {
