@@ -47,7 +47,7 @@ Therefore no separate discovered-edge structure is required.
 
 ## Map Rendering
 
-Renderer displays only the discovered portion of the world.
+The map panel displays only the discovered portion of the world.
 
 Display: - discovered rooms - their known exits
 

@@ -7,7 +7,7 @@ WayFinder consists of five components:
 - WayFinder Client Shell (WCS)
 - WayFinder Event Gateway (WEG)
 - WayFinder Navigation Engine (WNE)
-- WayFinder Map Renderer (WMR)
+- WayFinder Mapping Runtime (WMR)
 - WayFinder Telnet Layer (WTL)
 
 Pipeline:

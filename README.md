@@ -30,7 +30,7 @@ MUD[Live MUD Server]
 WCS[WayFinder Client Shell]
 WEG[WayFinder Event Gateway]
 WNE[WayFinder Navigation Engine]
-WMR[WayFinder Map Renderer]
+WMR[WayFinder Mapping Runtime]
 WMP[WayFinder Map Panel]
 
 MUD --> WTL
@@ -59,14 +59,14 @@ WF[WayFinder]
 WCS[Client Shell]
 WEG[Event Gateway]
 WNE[Navigation Engine]
-WMR[Map Renderer]
+WMR[Mapping Runtime]
 WMP[Map Panel]
 
 WF --> WCS
 WF --> WEG
 WF --> WNE
 WF --> WMR
-WF --> WMP
+WCS --> WMP
 ```
 
 ### Responsibilities
@@ -76,8 +76,9 @@ WF --> WMP
 | **WTL** | Raw text transport source |
 | **WEG** | Convert raw MUD text into structured WayFinder events |
 | **WNE** | Maintain the player’s discovered navigation state |
-| **WMR** | Project WNE’s discovered topology into map layout/state |
+| **WMR** | Compute the map layout from WNE’s discovered topology |
 | **WCS** | User-facing shell and orchestration surface |
+| **WMP** | Draw the map from WMR’s layout inside WCS |
 
 ---
 
@@ -109,9 +110,8 @@ M --> N[Allow spacing gaps]
 N --> O[Prevent insertion between locked pairs]
 O --> P[Produce new projection]
 
-G --> Q[Renderer builds draw model]
+G --> Q[Map panel draws layout]
 P --> Q
-Q --> R[Map panel displays map]
 ```
 
 **Key principle**
