@@ -2,9 +2,11 @@ package win32
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"syscall"
+	"unsafe"
 
 	"WayFinder/wmr"
 )
@@ -14,14 +16,18 @@ const (
 	wmMouseMove      = 0x0200
 	wmLButtonDown    = 0x0201
 	wmLButtonUp      = 0x0202
+	wmLButtonDouble  = 0x0203
 	wmCaptureChanged = 0x0215
 	ssNotify         = 0x0100
 	swShow           = 5
 	mkShift          = 0x0004
+	mkControl        = 0x0008
 
 	mapEditID   = 1001
 	mapSaveID   = 1002
 	mapCancelID = 1003
+
+	selectionDragThreshold = 4
 )
 
 var (
@@ -31,15 +37,18 @@ var (
 	procDefSubclassProc            = commonControls.NewProc("DefSubclassProc")
 	procSetCapture                 = user32.NewProc("SetCapture")
 	procReleaseCapture             = user32.NewProc("ReleaseCapture")
+	procFrameRect                  = user32.NewProc("FrameRect")
 )
 
 type mapEditor struct {
-	active  *wmr.Correction
-	failure bool
-	draft   liveMapView
-	status  string
-	grid    mapGrid
-	drag    *mapRoomDrag
+	active   *wmr.Correction
+	failure  bool
+	draft    liveMapView
+	status   string
+	grid     mapGrid
+	selected map[wmr.RoomID]bool
+	drag     *mapRoomDrag
+	marquee  *mapMarquee
 }
 
 type mapRoomDrag struct {
@@ -48,8 +57,34 @@ type mapRoomDrag struct {
 	pointer    point
 	grid       mapGrid
 	wholeLane  bool
+	group      bool
 	horizontal bool
 	axisChosen bool
+}
+
+type mapMarquee struct {
+	start, end point
+	grid       mapGrid
+	additive   bool
+	dragged    bool
+}
+
+func (m mapMarquee) bounds() rect {
+	return rect{min(m.start.X, m.end.X), min(m.start.Y, m.end.Y), max(m.start.X, m.end.X) + 1, max(m.start.Y, m.end.Y) + 1}
+}
+
+func (m mapMarquee) selection(rooms []wmr.Room, existing map[wmr.RoomID]bool) map[wmr.RoomID]bool {
+	selected := make(map[wmr.RoomID]bool)
+	if m.additive {
+		maps.Copy(selected, existing)
+	}
+	bounds := m.bounds()
+	for _, room := range rooms {
+		if bounds.contains(m.grid.position(room)) {
+			selected[room.ID] = true
+		}
+	}
+	return selected
 }
 
 func createCorrectionControls(parent, instance uintptr) {
@@ -93,7 +128,7 @@ func (s *liveShell) openMapEditor(correction *wmr.Correction, failure bool) {
 	e.active, e.failure = correction, failure
 	e.draft = liveMapView{layout: correction.Draft, title: s.mapView.title}
 	e.draft.layout.Rooms = slices.Clone(correction.Draft.Rooms)
-	e.status = "Drag a room. Shift-drag moves its whole row or column."
+	e.status = "Drag to box-select. Ctrl-drag adds a box and Ctrl-click toggles a room. Drag selected rooms to move them. Shift-drag moves a row or column."
 	if failure {
 		e.status += " The yellow room is the destination."
 		setWindowText(hMapSave, "Save correction")
@@ -103,6 +138,7 @@ func (s *liveShell) openMapEditor(correction *wmr.Correction, failure bool) {
 		setWindowText(hMapCancel, "Cancel")
 	}
 	e.grid = mapGrid{}
+	e.selected = nil
 	procEnableWindow.Call(hWIC, 0)
 	s.updateCorrectionControls()
 }
@@ -145,6 +181,7 @@ func (s *liveShell) closeMapEditor() {
 	e := &s.mapEditor
 	e.endDrag()
 	e.active, e.draft, e.grid = nil, liveMapView{}, mapGrid{}
+	e.selected = nil
 	s.updateCorrectionControls()
 	if s.connected {
 		procEnableWindow.Call(hWIC, 1)
@@ -153,8 +190,8 @@ func (s *liveShell) closeMapEditor() {
 }
 
 func (e *mapEditor) endDrag() {
-	if e.drag != nil {
-		e.drag = nil
+	if e.drag != nil || e.marquee != nil {
+		e.drag, e.marquee = nil, nil
 		procReleaseCapture.Call()
 	}
 }
@@ -168,8 +205,37 @@ func (s *liveShell) drawMap(item *drawItem) {
 	var frozen *mapGrid
 	if e.drag != nil {
 		frozen = &e.drag.grid
+	} else if e.marquee != nil {
+		frozen = &e.marquee.grid
 	}
 	e.grid = e.draft.draw(item.dc, item.bounds, s.gmcpStatus, e.status, frozen)
+	e.drawSelection(item.dc)
+}
+
+func (e *mapEditor) drawSelection(dc uintptr) {
+	if e.grid.step == 0 || (len(e.selected) == 0 && e.marquee == nil) {
+		return
+	}
+	brush, _, _ := procCreateSolidBrush.Call(0x008DE6BE)
+	if brush == 0 {
+		return
+	}
+	defer procDeleteObject.Call(brush)
+
+	selected := e.selected
+	if e.marquee != nil && (!e.marquee.additive || e.marquee.dragged) {
+		bounds := e.marquee.bounds()
+		procFrameRect.Call(dc, uintptr(unsafe.Pointer(&bounds)), brush)
+		selected = e.marquee.selection(e.draft.layout.Rooms, selected)
+	}
+	half := e.grid.roomHalf() + 1
+	for _, room := range e.draft.layout.Rooms {
+		if selected[room.ID] {
+			at := e.grid.position(room)
+			bounds := rect{at.X - half, at.Y - half, at.X + half + 1, at.Y + half + 1}
+			procFrameRect.Call(dc, uintptr(unsafe.Pointer(&bounds)), brush)
+		}
+	}
 }
 
 func mapPanelProc(hwnd, message, wParam, lParam, _, _ uintptr) uintptr {
@@ -178,28 +244,31 @@ func mapPanelProc(hwnd, message, wParam, lParam, _, _ uintptr) uintptr {
 		if e.active != nil {
 			p := point{int32(int16(lParam)), int32(int16(lParam >> 16))}
 			switch message {
-			case wmLButtonDown:
-				if e.startDrag(p, wParam&mkShift != 0) {
+			case wmLButtonDown, wmLButtonDouble:
+				if e.startDrag(p, wParam&mkShift != 0, wParam&mkControl != 0) {
 					procSetCapture.Call(hwnd)
 				}
 				return 0
 			case wmMouseMove:
-				if e.drag != nil {
-					e.moveDrag(p)
+				if e.updateDrag(p) {
+					procInvalidateRect.Call(hwnd, 0, 0)
 					return 0
 				}
 			case wmLButtonUp:
-				if e.drag != nil {
-					e.moveDrag(p)
-					e.drag = nil
-					procReleaseCapture.Call()
+				if e.updateDrag(p) {
+					if e.marquee != nil {
+						e.finishSelection()
+					}
+					e.endDrag()
 					procInvalidateRect.Call(hwnd, 0, 0)
 					return 0
 				}
 			case wmCaptureChanged:
 				if e.drag != nil {
 					copy(e.draft.layout.Rooms, e.drag.rooms)
-					e.drag = nil
+				}
+				if e.drag != nil || e.marquee != nil {
+					e.drag, e.marquee = nil, nil
 					procInvalidateRect.Call(hwnd, 0, 0)
 				}
 			}
@@ -209,56 +278,109 @@ func mapPanelProc(hwnd, message, wParam, lParam, _, _ uintptr) uintptr {
 	return result
 }
 
-func (e *mapEditor) startDrag(p point, wholeLane bool) bool {
-	if e.grid.step == 0 {
-		return false
+func (e *mapEditor) roomAt(p point) int {
+	if e.grid.step == 0 || !e.grid.area.contains(p) {
+		return -1
 	}
 	index, distance := -1, math.MaxFloat64
 	for i, room := range e.draft.layout.Rooms {
 		at := e.grid.position(room)
 		d := max(math.Abs(float64(p.X-at.X)), math.Abs(float64(p.Y-at.Y)))
-		if d <= float64(e.grid.roomHalf()+2) && (d < distance || (d == distance && room.ID == e.draft.layout.Current)) {
+		preferred := room.ID == e.draft.layout.Current
+		if index >= 0 && e.selected[room.ID] != e.selected[e.draft.layout.Rooms[index].ID] {
+			preferred = e.selected[room.ID]
+		}
+		if d <= float64(e.grid.roomHalf()+2) && (d < distance || (d == distance && preferred)) {
 			index, distance = i, d
 		}
 	}
+	return index
+}
+
+func (e *mapEditor) toggleSelection(p point) bool {
+	index := e.roomAt(p)
 	if index < 0 {
 		return false
 	}
-	e.drag = &mapRoomDrag{
-		index: index, rooms: slices.Clone(e.draft.layout.Rooms), pointer: p, grid: e.grid, wholeLane: wholeLane,
+	id := e.draft.layout.Rooms[index].ID
+	if e.selected[id] {
+		delete(e.selected, id)
+	} else {
+		if e.selected == nil {
+			e.selected = make(map[wmr.RoomID]bool)
+		}
+		e.selected[id] = true
 	}
 	return true
 }
 
+func (e *mapEditor) startDrag(p point, wholeLane, additive bool) bool {
+	if e.grid.step == 0 || !e.grid.area.contains(p) {
+		return false
+	}
+	index := e.roomAt(p)
+	if additive || index < 0 {
+		e.marquee = &mapMarquee{start: p, end: p, grid: e.grid, additive: additive}
+		return true
+	}
+	group := !wholeLane && e.selected[e.draft.layout.Rooms[index].ID]
+	if !group {
+		e.selected = nil
+	}
+	e.drag = &mapRoomDrag{
+		index: index, rooms: slices.Clone(e.draft.layout.Rooms), pointer: p, grid: e.grid, wholeLane: wholeLane, group: group,
+	}
+	return true
+}
+
+func (e *mapEditor) updateDrag(p point) bool {
+	if box := e.marquee; box != nil {
+		box.end = box.grid.area.clamp(p)
+		dx, dy := p.X-box.start.X, p.Y-box.start.Y
+		box.dragged = box.dragged || max(dx, -dx, dy, -dy) >= selectionDragThreshold
+		return true
+	}
+	if e.drag != nil {
+		e.moveDrag(e.drag.grid.area.clamp(p))
+		return true
+	}
+	return false
+}
+
+func (e *mapEditor) finishSelection() {
+	if e.marquee.additive && !e.marquee.dragged {
+		e.toggleSelection(e.marquee.start)
+		return
+	}
+	e.selected = e.marquee.selection(e.draft.layout.Rooms, e.selected)
+}
+
 func (e *mapEditor) moveDrag(p point) {
 	d := e.drag
-	area := d.grid.area
-	p.X = max(area.Left, min(area.Right-1, p.X))
-	p.Y = max(area.Top, min(area.Bottom-1, p.Y))
 	columns := (float64(p.X) - float64(d.pointer.X)) / d.grid.step
 	rows := (float64(p.Y) - float64(d.pointer.Y)) / d.grid.step
-	if !d.axisChosen {
+	if !d.group && !d.axisChosen {
 		if max(math.Abs(columns), math.Abs(rows)) < 0.5 {
 			return
 		}
 		d.axisChosen, d.horizontal = true, math.Abs(columns) >= math.Abs(rows)
 	}
 	anchor := d.rooms[d.index]
-	delta := int(math.Round(rows))
-	if d.horizontal {
-		delta = int(math.Round(columns))
+	rowDelta, columnDelta := int(math.Round(rows)), int(math.Round(columns))
+	if !d.group {
+		if d.horizontal {
+			rowDelta = 0
+		} else {
+			columnDelta = 0
+		}
 	}
 	for i, room := range d.rooms {
 		sameLane := (d.horizontal && room.C == anchor.C) || (!d.horizontal && room.R == anchor.R)
-		if i != d.index && !(d.wholeLane && sameLane) {
+		if i != d.index && !(d.wholeLane && sameLane) && !(d.group && e.selected[room.ID]) {
 			continue
 		}
-		if d.horizontal {
-			room.C += delta
-		} else {
-			room.R += delta
-		}
+		room.R += rowDelta
+		room.C += columnDelta
 		e.draft.layout.Rooms[i] = room
 	}
-	procInvalidateRect.Call(hWMP, 0, 0)
 }

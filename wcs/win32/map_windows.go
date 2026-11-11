@@ -56,6 +56,14 @@ func (g mapGrid) position(room wmr.Room) point {
 
 func (g mapGrid) roomHalf() int32 { return max(1, min(7, int32(g.step/4))) }
 
+func (r rect) contains(p point) bool {
+	return p.X >= r.Left && p.X < r.Right && p.Y >= r.Top && p.Y < r.Bottom
+}
+
+func (r rect) clamp(p point) point {
+	return point{max(r.Left, min(r.Right-1, p.X)), max(r.Top, min(r.Bottom-1, p.Y))}
+}
+
 func (v liveMapView) draw(dc uintptr, bounds rect, gmcpStatus, editStatus string, dragGrid *mapGrid) mapGrid {
 	background, _, _ := procCreateSolidBrush.Call(mapBackground)
 	fillMapRect(dc, bounds, background)
