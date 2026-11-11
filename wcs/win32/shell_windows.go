@@ -167,6 +167,9 @@ func RunWCS() {
 		if ret == 0 {
 			break
 		}
+		if liveWindow != nil && m.Message == wmMouseWheel && liveWindow.zoomMapAtScreen(mouseMessagePoint(m.LParam), int(int16(m.WParam>>16))) {
+			continue
+		}
 		if liveWindow != nil && m.HWnd == hWIC && m.Message == wmKeyDown {
 			switch m.WParam {
 			case vkReturn:

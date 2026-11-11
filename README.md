@@ -21,6 +21,8 @@ from the current session. Close the window to disconnect.
 The Map Panel uses the room IDs and exit destinations HolyQuest sends over
 GMCP. It reveals rooms as you visit them and highlights your current location.
 Short ticks mark compass exits, and arrows inside rooms mark up and down exits.
+Use the mouse wheel over the map to zoom and right-drag to pan. In edit mode,
+click empty space to clear any room selection before zooming or panning.
 WayFinder automatically saves the explored map and accepted edits for each
 server address under `%APPDATA%\WayFinder\maps`. On the next session, the map
 loads immediately and the server's first room report sets your location.

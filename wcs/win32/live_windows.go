@@ -77,6 +77,7 @@ type liveShell struct {
 	mapView         liveMapView
 	gmcpStatus      string
 	mapEditor       mapEditor
+	mapViewport     mapViewport
 	beginMapEdit    func() *wmr.Correction
 }
 

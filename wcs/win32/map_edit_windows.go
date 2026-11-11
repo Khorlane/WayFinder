@@ -129,6 +129,8 @@ func (s *liveShell) updateCorrectionControls() {
 
 func (s *liveShell) openMapEditor(correction *wmr.Correction, failure bool) {
 	e := &s.mapEditor
+	s.endMapPan()
+	s.mapViewport.grid = mapGrid{}
 	e.endDrag()
 	e.active, e.failure = correction, failure
 	e.baseline = correction.Draft
@@ -196,6 +198,8 @@ func (s *liveShell) editMapCommand(id uintptr) bool {
 
 func (s *liveShell) closeMapEditor() {
 	e := &s.mapEditor
+	s.endMapPan()
+	s.mapViewport.grid = mapGrid{}
 	e.endDrag()
 	if e.active != nil {
 		e.active.Close()
@@ -217,8 +221,9 @@ func (e *mapEditor) endDrag() {
 
 func (s *liveShell) drawMap(item *drawItem) {
 	e := &s.mapEditor
+	v := &s.mapViewport
 	if e.active == nil {
-		s.mapView.draw(item.dc, item.bounds, s.gmcpStatus, "", nil)
+		v.grid = s.mapView.draw(item.dc, item.bounds, s.gmcpStatus, "", v, nil, nil)
 		return
 	}
 	var frozen *mapGrid
@@ -227,12 +232,12 @@ func (s *liveShell) drawMap(item *drawItem) {
 	} else if e.marquee != nil {
 		frozen = &e.marquee.grid
 	}
-	e.grid = e.draft.draw(item.dc, item.bounds, s.gmcpStatus, e.status, frozen)
-	e.drawSelection(item.dc)
+	v.grid = e.draft.draw(item.dc, item.bounds, s.gmcpStatus, e.status, v, frozen, e.drawSelection)
+	e.grid = v.grid
 }
 
-func (e *mapEditor) drawSelection(dc uintptr) {
-	if e.grid.step == 0 || (len(e.selected) == 0 && e.marquee == nil) {
+func (e *mapEditor) drawSelection(dc uintptr, grid mapGrid) {
+	if len(e.selected) == 0 && e.marquee == nil {
 		return
 	}
 	brush, _, _ := procCreateSolidBrush.Call(0x008DE6BE)
@@ -247,10 +252,10 @@ func (e *mapEditor) drawSelection(dc uintptr) {
 		procFrameRect.Call(dc, uintptr(unsafe.Pointer(&bounds)), brush)
 		selected = e.marquee.selection(e.draft.layout.Rooms, selected)
 	}
-	half := e.grid.roomHalf() + 1
+	half := grid.roomHalf() + 1
 	for _, room := range e.draft.layout.Rooms {
 		if selected[room.ID] {
-			at := e.grid.position(room)
+			at := grid.position(room)
 			bounds := rect{at.X - half, at.Y - half, at.X + half + 1, at.Y + half + 1}
 			procFrameRect.Call(dc, uintptr(unsafe.Pointer(&bounds)), brush)
 		}
@@ -259,12 +264,43 @@ func (e *mapEditor) drawSelection(dc uintptr) {
 
 func mapPanelProc(hwnd, message, wParam, lParam, _, _ uintptr) uintptr {
 	if liveWindow != nil {
-		e := &liveWindow.mapEditor
+		s := liveWindow
+		e := &s.mapEditor
+		v := &s.mapViewport
+		p := mouseMessagePoint(lParam)
+		switch message {
+		case wmMouseWheel:
+			if s.zoomMapAtScreen(p, int(int16(wParam>>16))) {
+				return 0
+			}
+		case wmRButtonDown:
+			if v.pan == nil && s.canNavigateMap() && v.grid.step > 0 && v.grid.area.contains(p) {
+				v.pan = &mapPan{start: p, grid: v.grid}
+				procSetCapture.Call(hwnd)
+			}
+			return 0
+		case wmRButtonUp:
+			if v.pan != nil {
+				v.movePan(p)
+				e.grid = v.grid
+				s.endMapPan()
+				procInvalidateRect.Call(hwnd, 0, 0)
+			}
+			return 0
+		case wmMouseMove:
+			if v.pan != nil {
+				v.movePan(p)
+				e.grid = v.grid
+				procInvalidateRect.Call(hwnd, 0, 0)
+				return 0
+			}
+		case wmCaptureChanged:
+			v.pan = nil
+		}
 		if e.active != nil {
-			p := point{int32(int16(lParam)), int32(int16(lParam >> 16))}
 			switch message {
 			case wmLButtonDown, wmLButtonDouble:
-				if e.startDrag(p, wParam&mkShift != 0, wParam&mkControl != 0) {
+				if v.pan == nil && e.startDrag(p, wParam&mkShift != 0, wParam&mkControl != 0) {
 					procSetCapture.Call(hwnd)
 				}
 				return 0

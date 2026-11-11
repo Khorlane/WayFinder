@@ -27,6 +27,8 @@ var mapExitOffsets = map[string]point{
 	"S": {0, 1}, "SW": {-1, 1}, "W": {-1, 0}, "NW": {-1, -1},
 }
 
+var procIntersectClipRect = gdi32.NewProc("IntersectClipRect")
+
 type drawItem struct {
 	controlType, controlID, itemID, action, state uint32
 	window, dc                                    uintptr
@@ -54,7 +56,13 @@ func (g mapGrid) position(room wmr.Room) point {
 	}
 }
 
-func (g mapGrid) roomHalf() int32 { return max(1, min(7, int32(g.step/4))) }
+func (g mapGrid) center() (float64, float64) {
+	return (float64(g.area.Left) + float64(g.area.Right)) / 2, (float64(g.area.Top) + float64(g.area.Bottom)) / 2
+}
+
+func (g mapGrid) roomHalf() int32 {
+	return max(1, min(int32(g.step/4), max(7, int32(g.step/5))))
+}
 
 func (r rect) contains(p point) bool {
 	return p.X >= r.Left && p.X < r.Right && p.Y >= r.Top && p.Y < r.Bottom
@@ -64,7 +72,7 @@ func (r rect) clamp(p point) point {
 	return point{max(r.Left, min(r.Right-1, p.X)), max(r.Top, min(r.Bottom-1, p.Y))}
 }
 
-func (v liveMapView) draw(dc uintptr, bounds rect, gmcpStatus, editStatus string, dragGrid *mapGrid) mapGrid {
+func (v liveMapView) draw(dc uintptr, bounds rect, gmcpStatus, editStatus string, viewport *mapViewport, dragGrid *mapGrid, overlay func(uintptr, mapGrid)) mapGrid {
 	background, _, _ := procCreateSolidBrush.Call(mapBackground)
 	fillMapRect(dc, bounds, background)
 	procDeleteObject.Call(background)
@@ -114,11 +122,15 @@ func (v liveMapView) draw(dc uintptr, bounds rect, gmcpStatus, editStatus string
 	}
 	area.Top = line.Bottom + 6
 	if len(v.layout.Rooms) > 0 && area.Bottom-area.Top >= 12 {
-		grid := fitMapGrid(v.layout.Rooms, area, editStatus != "")
+		grid := viewport.project(fitMapGrid(v.layout.Rooms, area, editStatus != ""))
 		if dragGrid != nil {
 			grid = *dragGrid
 		}
+		procIntersectClipRect.Call(dc, uintptr(area.Left), uintptr(area.Top), uintptr(area.Right), uintptr(area.Bottom))
 		v.drawRooms(dc, grid)
+		if overlay != nil {
+			overlay(dc, grid)
+		}
 		return grid
 	}
 	return mapGrid{}
@@ -160,7 +172,7 @@ func (v liveMapView) drawRooms(dc uintptr, grid mapGrid) {
 
 	half := grid.roomHalf()
 	// Leave a gap between ticks on neighboring boxes even at reduced scales.
-	tickLength := min(6, int32(grid.step)/5, (int32(grid.step)-2*half-2)/2)
+	tickLength := min(max(6, int32(grid.step/6)), int32(grid.step)/5, (int32(grid.step)-2*half-2)/2)
 	if tickLength > 0 {
 		v.drawCompassExits(dc, positions, half, tickLength)
 	}
@@ -209,7 +221,7 @@ func (v liveMapView) drawVerticalExits(dc uintptr, positions map[wmr.RoomID]poin
 		return
 	}
 	previous, _, _ := procSelectObject.Call(dc, pen)
-	radius, arm := min(4, half), min(2, half-1)
+	radius, arm := min(half, max(4, half/2)), min(half-1, max(2, half/3))
 	for _, room := range v.layout.Rooms {
 		dirs := v.layout.ExitDirections[room.ID]
 		up, down := slices.Contains(dirs, "U"), slices.Contains(dirs, "D")
