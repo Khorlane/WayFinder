@@ -37,6 +37,7 @@ type SolverContext struct {
 	ColName               func(int) string
 	Debugln               func(...any)
 	Debugf                func(string, ...any)
+	ReportRejected        func(string, map[SolverRoomID][2]int, error)
 }
 
 type SolverRoomState struct {
@@ -137,6 +138,7 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs SolverConstraintSet, enterID,
 	if !ok {
 		return RebuildResult{}, fmt.Errorf("mapping error: rebuild got unsupported direction %q", dirMoved)
 	}
+	cs.Relations = append(cs.Relations, requiredMove(fromID, enterID, dirMoved, drMove, dcMove))
 
 	discovered := make(map[SolverRoomID]struct{}, len(cs.Discovered)+2)
 	for id := range cs.Discovered {
@@ -355,24 +357,50 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs SolverConstraintSet, enterID,
 
 	s.ctx.Debugln("REPACK START")
 	s.ctx.Debugln("mode=local")
+	validate := func(coords map[SolverRoomID][2]int) error {
+		if err := s.ValidateConstraintSet(cs, func(id SolverRoomID) (int, int, bool) {
+			cell, placed := coords[id]
+			return cell[0], cell[1], placed
+		}); err != nil {
+			return err
+		}
+		return validateConnections(cs, coords)
+	}
+	validateRepack := func(candidate string, coords map[SolverRoomID][2]int) error {
+		err := validate(coords)
+		if err != nil && s.ctx.ReportRejected != nil {
+			s.ctx.ReportRejected(candidate, coords, err)
+		}
+		return err
+	}
 	coords, newOcc, err := layoutApprox(true)
+	if err == nil {
+		err = validateRepack("local repack", coords)
+	}
 	if err != nil {
 		s.ctx.Debugln("REPACK FALLBACK")
 		s.ctx.Debugf("reason=%v\n", err)
 		s.ctx.Debugln("mode=full_rebuild")
 		coords, newOcc, err = layoutApprox(false)
-		if err != nil {
-			return RebuildResult{}, err
+		if err == nil {
+			err = validateRepack("full repack", coords)
 		}
 	}
-
-	fromRC, okFrom := coords[fromID]
-	enterRC, okEnter := coords[enterID]
-	if !okFrom || !okEnter {
-		return RebuildResult{}, fmt.Errorf("mapping error: repack failed to place from/enter rooms")
+	compact, compactOcc, compactErr := s.rebuildOrdered(cs, discovered, oldPos, fromID, enterID, validate)
+	if compactErr == nil && (err != nil || scoreRebuild(compact, oldPos).betterThan(scoreRebuild(coords, oldPos))) {
+		coords, newOcc, err = compact, compactOcc, nil
 	}
-	if enterRC[0] != fromRC[0]+drMove || enterRC[1] != fromRC[1]+dcMove {
-		return RebuildResult{}, fmt.Errorf("mapping error: repack did not satisfy immediate move %s -%s-> %s", fromID, dirMoved, enterID)
+	if err != nil {
+		// A first visit can need a cell on a lane already reserved by a lock.
+		// Open a gap in the existing layout when the repacks cannot place it.
+		gap, gapOcc := openDiscoveryLane(discovered, oldPos, fromID, enterID, [2]int{drMove, dcMove})
+		if gap != nil && validateRepack("discovery lane insertion", gap) == nil {
+			s.ctx.Debugln("mode=discovery_lane_insertion")
+			coords, newOcc, err = gap, gapOcc, nil
+		}
+	}
+	if err != nil {
+		return RebuildResult{}, fmt.Errorf("repack rejected: %v; compact rebuild: %w", err, compactErr)
 	}
 
 	roomStates := make(map[SolverRoomID]RebuildRoomState, len(rooms))
@@ -391,4 +419,57 @@ func (s *ConstraintSolver) ComputeRebuildResult(cs SolverConstraintSet, enterID,
 		Occ:     newOcc,
 		Current: enterID,
 	}, nil
+}
+
+func requiredMove(from, to SolverRoomID, direction string, dr, dc int) SolverConstraintRelation {
+	cardinal := dr == 0 || dc == 0
+	return SolverConstraintRelation{
+		Key:           SolverLockedAdjKey{From: from, To: to, Dir: direction},
+		Enforced:      true,
+		AxisAligned:   cardinal,
+		SameRow:       dr == 0,
+		SameColumn:    dc == 0,
+		RequiresOrder: true,
+		NoRoomBetween: cardinal,
+	}
+}
+
+func openDiscoveryLane(discovered map[SolverRoomID]struct{}, oldPos map[SolverRoomID][2]int, fromID, enterID SolverRoomID, delta [2]int) (map[SolverRoomID][2]int, map[[2]int]SolverRoomID) {
+	from, sourcePlaced := oldPos[fromID]
+	_, destinationPlaced := oldPos[enterID]
+	if !sourcePlaced || destinationPlaced || len(oldPos)+1 != len(discovered) {
+		return nil, nil
+	}
+	// A cardinal move needs one new lane. A diagonal move needs a different
+	// projection and is handled by the existing rebuild search.
+	if (delta[0] == 0) == (delta[1] == 0) {
+		return nil, nil
+	}
+	axis := 0
+	if delta[0] == 0 {
+		axis = 1
+	}
+	step := delta[axis]
+	opensGap := func(cell [2]int) bool {
+		return (cell[axis]-from[axis])*step > 0
+	}
+	// Keep the pinned start room fixed by shifting the other side of the cut.
+	pin, pinned := oldPos["1"]
+	shiftSourceSide := pinned && opensGap(pin)
+	coords := make(map[SolverRoomID][2]int, len(discovered))
+	occ := make(map[[2]int]SolverRoomID, len(discovered))
+	for id, cell := range oldPos {
+		if shiftSourceSide {
+			if !opensGap(cell) {
+				cell[axis] -= step
+			}
+		} else if opensGap(cell) {
+			cell[axis] += step
+		}
+		coords[id], occ[cell] = cell, id
+	}
+	cell := coords[fromID]
+	cell[axis] += step
+	coords[enterID], occ[cell] = cell, enterID
+	return coords, occ
 }

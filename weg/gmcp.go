@@ -59,6 +59,12 @@ func (g *LiveGateway) ReceiveGMCP(message []byte) RoomEntry {
 			dir := normalizeDirName(key)
 			if dir == "" {
 				dir = strings.ToUpper(strings.TrimSpace(key))
+				switch dir {
+				case "UP":
+					dir = "U"
+				case "DOWN":
+					dir = "D"
+				}
 			}
 			if !gmcpRoomID.MatchString(dir) || !gmcpRoomID.MatchString(string(destination)) {
 				return RoomEntry{}

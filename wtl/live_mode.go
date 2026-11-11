@@ -2,6 +2,7 @@ package wtl
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -34,16 +35,18 @@ func StreamLiveOutput(address string, output io.Writer) error {
 }
 
 // PlayLive relays commands and server output until the connection or window closes.
-func PlayLive(ctx context.Context, address string, commands <-chan string, display func(weg.LiveText), showMap func(wmr.Layout, string, error), connected func()) error {
+func PlayLive(ctx context.Context, address string, commands <-chan string, display func(weg.LiveText), showMap func(wmr.Layout, string, error, wmr.LayoutEditing), connected func()) error {
 	trace, closeTrace := openGMCPLog()
 	defer closeTrace()
+	capture, closeCapture := openMapperCapture(trace)
+	defer closeCapture()
 	gateway := weg.NewLiveGateway(func(update weg.LiveText) {
 		if update.GMCPStatus != "" {
 			trace.Print(update.GMCPStatus)
 		}
 		display(update)
 	})
-	configureLiveMap(gateway, showMap)
+	configureLiveMap(gateway, showMap, trace, capture)
 	dialer := net.Dialer{Timeout: liveDialTimeout}
 	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
@@ -98,17 +101,8 @@ func PlayLive(ctx context.Context, address string, commands <-chan string, displ
 }
 
 func openGMCPLog() (*log.Logger, func()) {
-	const name = "WayFinder-gmcp.log"
-	path := name
-	if exe, err := os.Executable(); err == nil {
-		path = filepath.Join(filepath.Dir(exe), name)
-	}
 	trace := log.New(os.Stderr, fmt.Sprintf("[pid %d] ", os.Getpid()), log.LstdFlags|log.Lmicroseconds)
-	flags := os.O_WRONLY | os.O_CREATE | os.O_APPEND
-	file, err := os.OpenFile(path, flags, 0o600)
-	if err != nil && path != name {
-		file, err = os.OpenFile(name, flags, 0o600)
-	}
+	file, err := openLiveDiagnostic("WayFinder-gmcp.log")
 	if err != nil {
 		trace.Printf("Could not open GMCP log: %v", err)
 		return trace, func() {}
@@ -117,11 +111,142 @@ func openGMCPLog() (*log.Logger, func()) {
 	return trace, func() { file.Close() }
 }
 
-func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string, error)) {
+func openLiveDiagnostic(name string) (*os.File, error) {
+	path := name
+	if exe, err := os.Executable(); err == nil {
+		path = filepath.Join(filepath.Dir(exe), name)
+	}
+	flags := os.O_WRONLY | os.O_CREATE | os.O_APPEND
+	file, err := os.OpenFile(path, flags, 0o600)
+	if err != nil && path != name {
+		file, err = os.OpenFile(name, flags, 0o600)
+	}
+	return file, err
+}
+
+func openMapperCapture(trace *log.Logger) (func(wmr.RebuildCapture) error, func()) {
+	var mu sync.Mutex
+	var file *os.File
+	var writeErr error
+	closed := false
+	open := sync.OnceValue(func() *json.Encoder {
+		file, writeErr = openLiveDiagnostic("WayFinder-mapper.jsonl")
+		if writeErr != nil {
+			trace.Printf("Could not open mapper captures: %v", writeErr)
+			return nil
+		}
+		return json.NewEncoder(file)
+	})
+	return func(capture wmr.RebuildCapture) error {
+			mu.Lock()
+			defer mu.Unlock()
+			if closed {
+				return fmt.Errorf("the game session has ended")
+			}
+			if encoder := open(); encoder != nil && writeErr == nil {
+				entry := struct {
+					Time time.Time `json:"time"`
+					PID  int       `json:"pid"`
+					wmr.RebuildCapture
+				}{time.Now(), os.Getpid(), capture}
+				if writeErr = encoder.Encode(entry); writeErr != nil {
+					trace.Printf("Could not write mapper capture attempt=%d: %v", capture.Attempt, writeErr)
+				}
+			}
+			return writeErr
+		}, func() {
+			mu.Lock()
+			defer mu.Unlock()
+			closed = true
+			if file != nil {
+				file.Close()
+			}
+		}
+}
+
+func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string, error, wmr.LayoutEditing), trace *log.Logger, capture func(wmr.RebuildCapture) error) {
 	discovery := NewDiscoveryState()
 	navigation := wne.NewLiveNavigation(nil, wneDiscoveryAdapter{d: discovery})
 	mapper := wmr.NewMapper()
 	mapper.BindTopology(wneTopologyAdapter{t: navigation})
+	mapper.SetIssueReporter(trace.Printf)
+	if capture != nil {
+		mapper.SetRebuildCapture(func(entry wmr.RebuildCapture) { _ = capture(entry) })
+	}
+	// Room reports and submissions from the Win32 thread share the live mapper.
+	var mapMu sync.Mutex
+	var pending *wmr.Correction
+	var pendingRoom wne.RoomID
+	var viewVersion uint64
+	recordView := func(layout wmr.Layout, title string, arrival wne.RoomArrival, err error) {
+		if capture == nil {
+			return
+		}
+		entry := wmr.RebuildCapture{
+			Stage:          "view",
+			From:           fromWNERoomID(arrival.From),
+			To:             fromWNERoomID(arrival.Room),
+			Direction:      arrival.Direction,
+			Current:        layout.Current,
+			Title:          title,
+			Rooms:          make(map[wmr.SolverRoomID][2]int, len(layout.Rooms)),
+			Links:          layout.Links,
+			ExitDirections: layout.ExitDirections,
+		}
+		for _, placed := range layout.Rooms {
+			entry.Rooms[wmr.SolverRoomID(placed.ID)] = [2]int{placed.R, placed.C}
+		}
+		if err != nil {
+			entry.Error = err.Error()
+		}
+		_ = capture(entry)
+	}
+	trackEdit := func(edit *wmr.Correction, room wne.RoomID, onApplied func(wmr.Layout)) {
+		pending, pendingRoom = edit, room
+		submit := edit.Submit
+		edit.Submit = func(rooms []wmr.Room) (wmr.Layout, error) {
+			mapMu.Lock()
+			defer mapMu.Unlock()
+			if pending != edit {
+				return wmr.Layout{}, fmt.Errorf("the live map changed while this edit was open")
+			}
+			applied, err := submit(rooms)
+			if err == nil {
+				pending = nil
+				onApplied(applied)
+			}
+			return applied, err
+		}
+		edit.Discard = func() {
+			mapMu.Lock()
+			defer mapMu.Unlock()
+			if pending == edit {
+				pending = nil
+			}
+		}
+	}
+	editingForView := func(layout wmr.Layout, title string, correction *wmr.Correction) wmr.LayoutEditing {
+		viewVersion++
+		version := viewVersion
+		editing := wmr.LayoutEditing{Failure: correction}
+		if len(layout.Rooms) != 0 {
+			editing.Begin = func() *wmr.Correction {
+				mapMu.Lock()
+				defer mapMu.Unlock()
+				if viewVersion != version || pending != nil {
+					return nil
+				}
+				current := mapper.SnapshotLayout(discovery, layout.Current)
+				edit := mapper.NewMapEdit(current, discovery, capture)
+				id := wne.RoomID(current.Current)
+				trackEdit(edit, id, func(applied wmr.Layout) {
+					recordView(applied, title, wne.RoomArrival{Room: id, From: id}, nil)
+				})
+				return edit
+			}
+		}
+		return editing
+	}
 
 	loadFallback := sync.OnceValue(func() error {
 		world, err := loadLiveWorld()
@@ -132,9 +257,23 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 	})
 	fallbackNoticeShown := false
 	gateway.OnRoomEntry(func(room weg.RoomEntry) {
+		mapMu.Lock()
+		var publish func()
+		defer func() {
+			mapMu.Unlock()
+			if publish != nil {
+				publish()
+			}
+		}()
+		queueView := func(layout wmr.Layout, err error, correction *wmr.Correction) {
+			editing := editingForView(layout, room.Name, correction)
+			publish = func() { showMap(layout, room.Name, err, editing) }
+		}
 		roomID := room.ID
+		exitsChanged := false
 		if room.Destinations != nil {
-			if navigation.RecordExits(roomID, room.Destinations) {
+			exitsChanged = navigation.RecordExits(roomID, room.Destinations)
+			if exitsChanged {
 				mapper.RefreshRoomExits(fromWNERoomID(roomID))
 			}
 		} else if roomID == "" || !navigation.HasRoom(roomID) {
@@ -142,7 +281,8 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 				if roomID != "" {
 					navigation.ObserveRoom(roomID)
 				}
-				showMap(mapper.SnapshotLayout(discovery, ""), room.Name, err)
+				pending = nil
+				queueView(mapper.SnapshotLayout(discovery, ""), err, nil)
 				fallbackNoticeShown = true
 				return
 			}
@@ -152,28 +292,54 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 			roomID, err = navigation.ResolveRoom(room.Name, room.Exits, room.Direction)
 			if err != nil {
 				navigation.ClearCurrentRoom()
-				showMap(mapper.SnapshotLayout(discovery, ""), room.Name, err)
+				pending = nil
+				queueView(mapper.SnapshotLayout(discovery, ""), err, nil)
 				return
 			}
 		}
+		if pending != nil && pendingRoom == roomID && !exitsChanged {
+			return
+		}
+		pending = nil
 		arrival := navigation.ObserveRoom(roomID)
 		id := fromWNERoomID(arrival.Room)
 		var err error
 		if arrival.Known {
 			err = mapper.PlaceArrival(id, fromWNERoomID(arrival.From), arrival.Direction)
+			if err != nil {
+				trace.Printf("Mapper placement failed room=%q from=%q direction=%q: %v", id, arrival.From, arrival.Direction, err)
+			}
 		} else {
 			err = fmt.Errorf("Room %s is missing from Rooms/", id)
 		}
-		showMap(mapper.SnapshotLayout(discovery, id), room.Name, err)
+		layout := mapper.SnapshotLayout(discovery, id)
+		if arrival.From != arrival.Room || exitsChanged {
+			recordView(layout, room.Name, arrival, err)
+		}
+		correction := mapper.NewCorrection(layout, discovery, err, capture)
+		if correction != nil {
+			trackEdit(correction, roomID, func(applied wmr.Layout) {
+				recordView(applied, room.Name, arrival, nil)
+			})
+		}
+		queueView(layout, err, correction)
 	}, func(name string) bool {
+		mapMu.Lock()
 		if err := loadFallback(); err != nil {
-			if !fallbackNoticeShown {
-				showMap(mapper.SnapshotLayout(discovery, ""), "", err)
-				fallbackNoticeShown = true
+			if fallbackNoticeShown || pending != nil {
+				mapMu.Unlock()
+				return false
 			}
+			fallbackNoticeShown = true
+			layout := mapper.SnapshotLayout(discovery, "")
+			editing := editingForView(layout, "", nil)
+			mapMu.Unlock()
+			showMap(layout, "", err, editing)
 			return false
 		}
-		return len(navigation.RoomsNamed(name)) > 0
+		known := len(navigation.RoomsNamed(name)) > 0
+		mapMu.Unlock()
+		return known
 	})
 }
 

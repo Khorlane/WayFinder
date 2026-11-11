@@ -38,6 +38,9 @@ type Mapper struct {
 	topo           Topology
 	locks          map[lockedAdjKey]struct{} // Monotonic set of discovered adjacencies that must remain satisfied.
 	debug          io.Writer
+	issueReporter  func(string, ...any)
+	rebuildCapture func(RebuildCapture)
+	rebuildAttempt uint64
 	solverProvider SolverProvider
 }
 
@@ -102,8 +105,8 @@ func (m *Mapper) BuildConstraintSet(extraDiscovered ...RoomID) ConstraintSet {
 	if m.topo != nil {
 		for from := range cs.Discovered {
 			exits := m.topo.ExitsFrom(from)
-			for _, dir := range []string{"N", "E", "S", "W"} {
-				to, ok := exits[dir]
+			for dir, to := range exits {
+				_, _, ok := dirDelta(dir)
 				if !ok {
 					continue
 				}
@@ -237,6 +240,16 @@ func (m *Mapper) SetDebugWriter(w io.Writer) {
 	m.debug = w
 }
 
+func (m *Mapper) SetIssueReporter(report func(string, ...any)) {
+	m.issueReporter = report
+}
+
+func (m *Mapper) reportIssue(format string, args ...any) {
+	if m.issueReporter != nil {
+		m.issueReporter(format, args...)
+	}
+}
+
 func (m *Mapper) SetSolverProvider(p SolverProvider) {
 	if p == nil {
 		m.solverProvider = DefaultSolverProvider
@@ -346,8 +359,10 @@ func (m *Mapper) setOcc(id RoomID, r, c int) {
 
 	// If target cell is occupied by some *other* room, that's a bug in caller logic.
 	if occ, ok := m.occ[[2]int{r, c}]; ok && occ != id {
-		panic(fmt.Sprintf("setOcc collision at (R=%d,C=%s): trying to place %s but %s is there",
-			r, colName(c), string(id), string(occ)))
+		problem := fmt.Sprintf("setOcc collision at (R=%d,C=%s): trying to place %s but %s is there",
+			r, colName(c), string(id), string(occ))
+		m.reportIssue("Mapper invariant failure: %s", problem)
+		panic(problem)
 	}
 
 	rm.R, rm.C = r, c
@@ -403,8 +418,8 @@ func (m *Mapper) noRoomBetweenAxis(coordAfter func(RoomID) (int, int, bool), fro
 	if fromR != toR && fromC != toC {
 		return true
 	}
-	for id, rm := range m.rooms {
-		if rm == nil || !rm.Placed || id == fromID || id == toID {
+	for id := range m.rooms {
+		if id == fromID || id == toID {
 			continue
 		}
 		r, c, ok := coordAfter(id)
@@ -428,29 +443,19 @@ func (m *Mapper) refreshLockedAdjacencies() {
 		}
 		exits := m.topo.ExitsFrom(from)
 		for dir, to := range exits {
+			key := lockedAdjKey{From: from, To: to, Dir: dir}
+			if _, locked := m.locks[key]; locked {
+				continue
+			}
 			toRm := m.rooms[to]
 			if toRm == nil || !toRm.Placed {
 				continue
 			}
-			if edgeAlignedAndOrdered(fromRm.R, fromRm.C, toRm.R, toRm.C, dir) &&
-				m.noRoomBetweenAxis(
-					func(id RoomID) (int, int, bool) {
-						rm := m.rooms[id]
-						if rm == nil || !rm.Placed {
-							return 0, 0, false
-						}
-						return rm.R, rm.C, true
-					},
-					from, to, fromRm.R, fromRm.C, toRm.R, toRm.C,
-				) {
-				m.locks[lockedAdjKey{From: from, To: to, Dir: dir}] = struct{}{}
+			if edgeAlignedAndOrdered(fromRm.R, fromRm.C, toRm.R, toRm.C, dir) && m.canLockConnection(key, fromRm, toRm) {
+				m.locks[key] = struct{}{}
 			}
 		}
 	}
-}
-
-func (m *Mapper) validateLockedAdjacencies(coordAfter func(RoomID) (int, int, bool)) error {
-	return m.validateConstraintSet(m.BuildConstraintSet(), coordAfter)
 }
 
 func (m *Mapper) validateConstraintSet(cs ConstraintSet, coordAfter func(RoomID) (int, int, bool)) error {
@@ -502,11 +507,15 @@ func (m *Mapper) solverContext() SolverContext {
 }
 
 func (m *Mapper) solver() SolverEngine {
+	return m.solverFor(m.solverContext())
+}
+
+func (m *Mapper) solverFor(ctx SolverContext) SolverEngine {
 	provider := m.solverProvider
 	if provider == nil {
 		provider = DefaultSolverProvider
 	}
-	return provider(m.solverContext())
+	return provider(ctx)
 }
 
 func (m *Mapper) toSolverConstraintSet(cs ConstraintSet) SolverConstraintSet {
@@ -1488,9 +1497,13 @@ func (m *Mapper) makeRoom(from *Room, dir string, blocker RoomID) error {
 		blocker, tried+2, strings.Join(failures, " | "))
 }
 
-func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomID, dirMoved string) error {
-	result, err := m.solver().ComputeRebuildResult(
-		m.toSolverConstraintSet(cs),
+func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomID, dirMoved string, rejected func(string, map[SolverRoomID][2]int, error)) error {
+	ctx := m.solverContext()
+	ctx.ReportRejected = rejected
+	solver := m.solverFor(ctx)
+	constraints := m.toSolverConstraintSet(cs)
+	result, err := solver.ComputeRebuildResult(
+		constraints,
 		SolverRoomID(enterID),
 		SolverRoomID(fromID),
 		dirMoved,
@@ -1498,6 +1511,28 @@ func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomI
 	if err != nil {
 		return err
 	}
+	err = solver.ValidateConstraintSet(constraints, func(id SolverRoomID) (int, int, bool) {
+		room := result.Rooms[id]
+		return room.R, room.C, room.Placed
+	})
+	coords := make(map[SolverRoomID][2]int, len(result.Occ))
+	for cell, id := range result.Occ {
+		coords[id] = cell
+	}
+	if err == nil {
+		err = validateConnections(constraints, coords)
+	}
+	if err != nil {
+		if rejected != nil {
+			rejected("final validation", coords, err)
+		}
+		return err
+	}
+	m.applyRebuildResult(result)
+	return nil
+}
+
+func (m *Mapper) applyRebuildResult(result RebuildResult) {
 	for id, r := range m.rooms {
 		if r == nil {
 			continue
@@ -1517,26 +1552,79 @@ func (m *Mapper) rebuildDiscoveredLayout(cs ConstraintSet, enterID, fromID RoomI
 	}
 	m.refreshLockedAdjacencies()
 	m.cur = m.rooms[RoomID(result.Current)]
-	return nil
 }
 
 // Enter applies one "arrival" event: ENTER id FROM dirMoved.
 func (m *Mapper) Enter(id RoomID, dirMoved string) error {
-	if err := m.enterIncremental(id, dirMoved); err == nil {
-		return nil
-	} else {
-		if dirMoved == "START" {
-			return err
+	if dirMoved == "START" || m.cur == nil || !m.cur.Placed {
+		return m.enterIncremental(id, dirMoved)
+	}
+	m.getRoom(id)
+	anchor := m.cur
+	before := m.captureSnapshot()
+	err := m.enterIncremental(id, dirMoved)
+	var incrementalCoords map[SolverRoomID][2]int
+	var incrementalConnections []SolverConstraintRelation
+	if err == nil {
+		cs := m.BuildConstraintSet(id, anchor.ID)
+		err = m.validateConstraintSet(cs, func(id RoomID) (int, int, bool) {
+			room := m.rooms[id]
+			if room == nil || !room.Placed {
+				return 0, 0, false
+			}
+			return room.R, room.C, true
+		})
+		if err == nil || m.rebuildCapture != nil {
+			incrementalCoords = m.placementCoordinates()
+			incrementalConnections = m.toSolverConstraintSet(cs).Relations
 		}
-		if m.cur == nil || !m.cur.Placed {
-			return err
+		if err == nil {
+			err = validateConnections(SolverConstraintSet{Relations: incrementalConnections}, incrementalCoords)
 		}
-		cs := m.BuildConstraintSet(id, m.cur.ID)
-		if rbErr := m.rebuildDiscoveredLayout(cs, id, m.cur.ID, dirMoved); rbErr != nil {
-			return fmt.Errorf("%v; rebuild failed: %v", err, rbErr)
-		}
+	}
+	if err == nil {
 		return nil
 	}
+	m.restoreSnapshot(before)
+	m.cur = anchor
+	m.rebuildAttempt++
+	attempt := m.rebuildAttempt
+	m.reportIssue("Mapper placement issue attempt=%d room=%q anchor=%q direction=%q: %v; attempting rebuild", attempt, id, anchor.ID, dirMoved, err)
+	cs := m.BuildConstraintSet(id, anchor.ID)
+	record := func(stage, candidate string, current RoomID, rooms map[SolverRoomID][2]int, connections []SolverConstraintRelation, issue error) {
+		capture := RebuildCapture{Attempt: attempt, Stage: stage, Candidate: candidate, From: anchor.ID, To: id, Direction: dirMoved, Current: current, Rooms: rooms, Connections: connections}
+		if issue != nil {
+			capture.Error = issue.Error()
+		}
+		m.rebuildCapture(capture)
+	}
+	var rejected func(string, map[SolverRoomID][2]int, error)
+	if m.rebuildCapture != nil {
+		connections := m.toSolverConstraintSet(cs).Relations
+		record("before", "", anchor.ID, m.placementCoordinates(), connections, nil)
+		if incrementalCoords != nil {
+			record("rejected", "incremental", id, incrementalCoords, incrementalConnections, err)
+		}
+		rejected = func(candidate string, rooms map[SolverRoomID][2]int, issue error) {
+			record("rejected", candidate, id, rooms, connections, issue)
+		}
+	}
+	if rbErr := m.rebuildDiscoveredLayout(cs, id, anchor.ID, dirMoved, rejected); rbErr != nil {
+		m.reportIssue("Mapper rebuild failed attempt=%d room=%q anchor=%q direction=%q: %v", attempt, id, anchor.ID, dirMoved, rbErr)
+		if m.rebuildCapture != nil {
+			record("failed", "", anchor.ID, nil, nil, rbErr)
+		}
+		return &rebuildFailure{
+			err:     fmt.Errorf("%v; rebuild failed: %v", err, rbErr),
+			attempt: attempt, from: anchor.ID, to: id, direction: dirMoved,
+			constraints: m.toSolverConstraintSet(cs),
+		}
+	}
+	m.reportIssue("Mapper rebuild succeeded attempt=%d room=%q anchor=%q direction=%q", attempt, id, anchor.ID, dirMoved)
+	if m.rebuildCapture != nil {
+		record("applied", "", id, m.placementCoordinates(), m.toSolverConstraintSet(m.BuildConstraintSet()).Relations, nil)
+	}
+	return nil
 }
 
 func (m *Mapper) enterIncremental(id RoomID, dirMoved string) error {

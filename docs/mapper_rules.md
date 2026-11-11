@@ -63,6 +63,9 @@ Example:
 
 A new room cannot appear between ECE and 061.
 
+Drawn connections may meet at a shared room. A connection crossing another
+connection or passing through an unrelated room makes the layout invalid.
+
 ------------------------------------------------------------------------
 
 ## Layout Rebuild
@@ -75,6 +78,12 @@ If incremental placement cannot satisfy constraints:
 4.  Allow gaps where needed
 
 This avoids complex incremental repair logic.
+
+Validate each candidate against the traversed direction, every locked lane,
+and the connection geometry before replacing the layout. During a rebuild,
+try row and column orders that allow independent groups to share coordinates.
+Among valid candidates, prefer the smallest footprint and use movement from
+the previous layout to break ties.
 
 ------------------------------------------------------------------------
 

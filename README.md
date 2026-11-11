@@ -19,6 +19,7 @@ session. Close the window to disconnect.
 
 The Map Panel uses the room IDs and exit destinations HolyQuest sends over
 GMCP. It reveals rooms as you visit them and highlights your current location.
+Short ticks mark compass exits, and arrows inside rooms mark up and down exits.
 For older servers that omit exit destinations, place the `Rooms/` dataset
 beside `WayFinder.exe` or in the working directory to enable legacy mapping.
 

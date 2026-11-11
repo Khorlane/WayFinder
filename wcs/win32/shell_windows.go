@@ -202,9 +202,13 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		if liveWindow != nil && lParam != 0 {
 			item := (*drawItem)(unsafe.Pointer(lParam))
 			if item.window == hWMP {
-				liveWindow.mapView.draw(item.dc, item.bounds, liveWindow.gmcpStatus)
+				liveWindow.drawMap(item)
 				return 1
 			}
+		}
+	case wmCommand:
+		if liveWindow != nil && wParam>>16 == 0 && liveWindow.editMapCommand(wParam&0xffff) {
+			return 0
 		}
 	case wmTimer:
 		if liveWindow != nil && wParam == liveTimer {

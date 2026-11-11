@@ -4,9 +4,10 @@ import "sort"
 
 // Layout is a detached snapshot for a view of discovered rooms.
 type Layout struct {
-	Rooms   []Room
-	Links   [][2]RoomID
-	Current RoomID
+	Rooms          []Room
+	Links          [][2]RoomID
+	ExitDirections map[RoomID][]string
+	Current        RoomID
 }
 
 // PlaceArrival projects a server-confirmed visit using the existing mapper.
@@ -66,32 +67,30 @@ func (m *Mapper) RefreshRoomExits(id RoomID) {
 }
 
 func (m *Mapper) placeFrom(room, anchor *Room, dir string) error {
-	before := m.captureSnapshot()
 	previous := m.cur
 	m.cur = anchor
 	err := m.Enter(room.ID, dir)
-	if err == nil {
-		err = m.validateLockedAdjacencies(func(id RoomID) (int, int, bool) {
-			if placed := m.rooms[id]; placed != nil && placed.Placed {
-				return placed.R, placed.C, true
-			}
-			return 0, 0, false
-		})
-	}
 	if err != nil {
-		m.restoreSnapshot(before)
 		m.cur = previous
 	}
 	return err
 }
 
 func (m *Mapper) SnapshotLayout(discovery discoveredView, current RoomID) Layout {
-	layout := Layout{Current: current}
+	layout := Layout{Current: current, ExitDirections: make(map[RoomID][]string)}
 	visible := make(map[RoomID]bool, len(m.occ))
 	for _, id := range m.occ {
 		if discovery.IsDiscovered(id) {
 			visible[id] = true
 			layout.Rooms = append(layout.Rooms, *m.rooms[id])
+			if m.topo != nil {
+				var dirs []string
+				for dir := range m.topo.ExitsFrom(id) {
+					dirs = append(dirs, dir)
+				}
+				sort.Strings(dirs)
+				layout.ExitDirections[id] = dirs
+			}
 		}
 	}
 	sort.Slice(layout.Rooms, func(i, j int) bool { return layout.Rooms[i].ID < layout.Rooms[j].ID })

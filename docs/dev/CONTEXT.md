@@ -22,5 +22,8 @@ Start with [AGENTS.md](../../AGENTS.md) for repository rules and the [README](..
 
 - Use `rg --files -g '*.go'` to find current source files and Git history to recover earlier decisions.
 - Update this page when a runtime mode or subsystem boundary changes. Keep open work in [ToDo.md](ToDo.md).
-- Live sessions append GMCP statuses, Telnet negotiation bytes, validated room IDs, and exit counts to `WayFinder-gmcp.log` beside the executable. The trace records protocol metadata only.
+- Live sessions append GMCP statuses, Telnet negotiation bytes, validated room IDs, exit counts, and mapper placement and rebuild diagnostics to `WayFinder-gmcp.log` beside the executable.
+- `WayFinder-mapper.jsonl` appends a `view` record from the same snapshot the Map Panel receives on login, room changes, and updates to the current room's exits. Match rebuild records by PID and attempt number to find the previous layout, rejected candidates, and the applied layout or failure.
+- A failed rebuild opens the map editor and pauses command input. Drag rooms or Shift-drag an entire column horizontally or row vertically. **Save correction** validates the draft and makes it the live layout on success. The capture records the coordinates and any validation error under the failed attempt's PID and number. **Skip correction** resumes command input with the previous layout.
+- **Edit map** opens the same editor during normal play once rooms are visible. **Save map** applies a valid edit to the live layout and records it with stage `edit`. **Cancel** discards the draft.
 - For the current workflow, build the requested change and report the executable path. The maintainer is handling testing for now.

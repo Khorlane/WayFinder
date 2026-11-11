@@ -51,11 +51,12 @@ const (
 	maxCommandHistory = 100
 )
 
-type livePlayer func(context.Context, string, <-chan string, func(weg.LiveText), func(wmr.Layout, string, error), func()) error
+type livePlayer func(context.Context, string, <-chan string, func(weg.LiveText), func(wmr.Layout, string, error, wmr.LayoutEditing), func()) error
 
 type liveUpdate struct {
 	text         weg.LiveText
 	mapView      *liveMapView
+	editing      wmr.LayoutEditing
 	status       string
 	connected    bool
 	disconnected bool
@@ -67,12 +68,15 @@ type liveShell struct {
 	play         livePlayer
 	commands     chan string
 	updates      chan liveUpdate
+	connected    bool
 	masked       bool
 	history      []string
 	historyIndex int
 	commandDraft string
 	mapView      liveMapView
 	gmcpStatus   string
+	mapEditor    mapEditor
+	beginMapEdit func() *wmr.Correction
 }
 
 var liveWindow *liveShell
@@ -126,10 +130,11 @@ func createLivePanels(parent uintptr) {
 	hWOV = createWindowEx(0, transcriptClass, empty, baseStyle|wsVScroll|esMultiline|esAutoVScroll|esReadOnly, 0, 0, 0, 0, parent, 0, instance, 0)
 	hWIC = createWindowEx(0, editClass, empty, baseStyle|wsDisabled|esAutoHScroll, 0, 0, 0, 0, parent, 0, instance, 0)
 	hWICLbl = createWindowEx(0, syscall.StringToUTF16Ptr("STATIC"), syscall.StringToUTF16Ptr("Command (Enter to send)"), wsChild|wsVisible, 0, 0, 0, 0, parent, 0, instance, 0)
-	hWMP = createWindowEx(0, syscall.StringToUTF16Ptr("STATIC"), syscall.StringToUTF16Ptr("WayFinder Map Panel"), baseStyle|ssOwnerDraw, 0, 0, 0, 0, parent, 0, instance, 0)
+	hWMP = createWindowEx(0, syscall.StringToUTF16Ptr("STATIC"), syscall.StringToUTF16Ptr("WayFinder Map Panel"), baseStyle|ssOwnerDraw|ssNotify, 0, 0, 0, 0, parent, 0, instance, 0)
 	if hWOV == 0 || hWIC == 0 || hWICLbl == 0 || hWMP == 0 {
 		panic("Could not create live game controls")
 	}
+	createCorrectionControls(parent, instance)
 	font, _, _ := procGetStockObject.Call(ansiFixedFont)
 	procSendMessageW.Call(hWOV, wmSetFont, font, 1)
 	procSendMessageW.Call(hWIC, wmSetFont, font, 1)
@@ -153,7 +158,16 @@ func layoutLivePanels(hwnd uintptr) {
 	mapWidth := width / 3
 	outputWidth := width - mapWidth - margin
 	moveWindow(hWOV, margin, margin, outputWidth, labelTop-2*margin)
-	moveWindow(hWMP, margin+outputWidth+margin, margin, mapWidth, labelTop-2*margin)
+	mapLeft, mapHeight := margin+outputWidth+margin, labelTop-2*margin
+	if liveWindow.beginMapEdit != nil || liveWindow.mapEditor.active != nil {
+		const footerHeight int32 = 28
+		mapHeight -= footerHeight
+		half := (mapWidth - 6) / 2
+		moveWindow(hMapEdit, mapLeft, margin+mapHeight+4, mapWidth, 24)
+		moveWindow(hMapSave, mapLeft, margin+mapHeight+4, half, 24)
+		moveWindow(hMapCancel, mapLeft+half+6, margin+mapHeight+4, half, 24)
+	}
+	moveWindow(hWMP, mapLeft, margin, mapWidth, mapHeight)
 	moveWindow(hWICLbl, margin, labelTop, width, labelHeight)
 	moveWindow(hWIC, margin, inputTop, width, inputHeight)
 }
@@ -167,8 +181,8 @@ func (s *liveShell) start(hwnd uintptr) {
 	go func() {
 		err := s.play(s.ctx, s.address, s.commands, func(text weg.LiveText) {
 			s.postUpdate(liveUpdate{text: text})
-		}, func(layout wmr.Layout, title string, err error) {
-			s.postUpdate(liveUpdate{mapView: &liveMapView{layout: layout, title: title, err: err}})
+		}, func(layout wmr.Layout, title string, err error, editing wmr.LayoutEditing) {
+			s.postUpdate(liveUpdate{mapView: &liveMapView{layout: layout, title: title, err: err}, editing: editing})
 		}, func() {
 			s.postUpdate(liveUpdate{connected: true})
 		})
@@ -198,13 +212,33 @@ func (s *liveShell) drainUpdates() {
 			}
 			if update.mapView != nil {
 				s.mapView = *update.mapView
+				hadEditButton := s.beginMapEdit != nil
+				s.beginMapEdit = update.editing.Begin
+				switch {
+				case update.editing.Failure != nil:
+					s.openMapEditor(update.editing.Failure, true)
+				case s.mapEditor.active != nil:
+					s.closeMapEditor()
+				case hadEditButton != (s.beginMapEdit != nil):
+					s.updateCorrectionControls()
+				}
 				procInvalidateRect.Call(hWMP, 0, 0)
 			}
 			if update.connected {
-				procEnableWindow.Call(hWIC, 1)
-				procSetFocus.Call(hWIC)
+				s.connected = true
+				if s.mapEditor.active == nil {
+					procEnableWindow.Call(hWIC, 1)
+					procSetFocus.Call(hWIC)
+				}
 			}
 			if update.disconnected {
+				s.connected = false
+				s.beginMapEdit = nil
+				if s.mapEditor.active != nil {
+					s.closeMapEditor()
+				} else {
+					s.updateCorrectionControls()
+				}
 				appendTranscript(weg.LiveSpan{Text: "\r\n\r\n" + update.status + "\r\n"})
 				procEnableWindow.Call(hWIC, 0)
 				setWindowText(hWIC, "")
@@ -224,6 +258,9 @@ func (s *liveShell) drainUpdates() {
 }
 
 func (s *liveShell) submitCommand() {
+	if s.mapEditor.active != nil {
+		return
+	}
 	command := commandText()
 	select {
 	case s.commands <- command:
