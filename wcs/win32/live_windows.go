@@ -63,20 +63,21 @@ type liveUpdate struct {
 }
 
 type liveShell struct {
-	ctx          context.Context
-	address      string
-	play         livePlayer
-	commands     chan string
-	updates      chan liveUpdate
-	connected    bool
-	masked       bool
-	history      []string
-	historyIndex int
-	commandDraft string
-	mapView      liveMapView
-	gmcpStatus   string
-	mapEditor    mapEditor
-	beginMapEdit func() *wmr.Correction
+	ctx             context.Context
+	address         string
+	play            livePlayer
+	commands        chan string
+	updates         chan liveUpdate
+	connected       bool
+	masked          bool
+	history         []string
+	historyIndex    int
+	commandDraft    string
+	retainedCommand string
+	mapView         liveMapView
+	gmcpStatus      string
+	mapEditor       mapEditor
+	beginMapEdit    func() *wmr.Correction
 }
 
 var liveWindow *liveShell
@@ -248,6 +249,10 @@ func (s *liveShell) drainUpdates() {
 				var mask uintptr
 				if s.masked {
 					mask = '*'
+					if s.retainedCommand != "" && commandText() == s.retainedCommand {
+						setWindowText(hWIC, "")
+					}
+					s.retainedCommand = ""
 				}
 				procSendMessageW.Call(hWIC, emSetPassword, mask, 0)
 			}
@@ -264,7 +269,12 @@ func (s *liveShell) submitCommand() {
 	command := commandText()
 	select {
 	case s.commands <- command:
-		setWindowText(hWIC, "")
+		if s.masked {
+			setWindowText(hWIC, "")
+		} else {
+			s.retainedCommand = command
+			procSendMessageW.Call(hWIC, emSetSel, 0, ^uintptr(0))
+		}
 		if !s.masked && command != "" {
 			if len(s.history) == maxCommandHistory {
 				copy(s.history, s.history[1:])

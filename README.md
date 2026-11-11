@@ -14,12 +14,16 @@ go build -ldflags=-H=windowsgui -o WayFinder.exe .
 
 WayFinder connects to HolyQuest at `129.212.241.43:7373` and displays the color
 transcript in the Output View. Type in the Input Console and press **Enter** to
-send a command. Use **Up** and **Down** to recall commands from the current
-session. Close the window to disconnect.
+send a command. The command stays selected so you can press **Enter** again to
+repeat it or type a replacement. Use **Up** and **Down** to recall commands
+from the current session. Close the window to disconnect.
 
 The Map Panel uses the room IDs and exit destinations HolyQuest sends over
 GMCP. It reveals rooms as you visit them and highlights your current location.
 Short ticks mark compass exits, and arrows inside rooms mark up and down exits.
+WayFinder automatically saves the explored map and accepted edits for each
+server address under `%APPDATA%\WayFinder\maps`. On the next session, the map
+loads immediately and the server's first room report sets your location.
 For older servers that omit exit destinations, place the `Rooms/` dataset
 beside `WayFinder.exe` or in the working directory to enable legacy mapping.
 

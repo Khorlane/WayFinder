@@ -3,6 +3,7 @@ package wtl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -46,7 +47,13 @@ func PlayLive(ctx context.Context, address string, commands <-chan string, displ
 		}
 		display(update)
 	})
-	configureLiveMap(gateway, showMap, trace, capture)
+	var store *liveMapStore
+	if path, err := liveMapPath(address); err != nil {
+		trace.Printf("Could not locate saved map: %v", err)
+	} else {
+		store = &liveMapStore{path: path}
+	}
+	configureLiveMap(gateway, showMap, trace, capture, store)
 	dialer := net.Dialer{Timeout: liveDialTimeout}
 	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
@@ -164,11 +171,20 @@ func openMapperCapture(trace *log.Logger) (func(wmr.RebuildCapture) error, func(
 		}
 }
 
-func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string, error, wmr.LayoutEditing), trace *log.Logger, capture func(wmr.RebuildCapture) error) {
-	discovery := NewDiscoveryState()
-	navigation := wne.NewLiveNavigation(nil, wneDiscoveryAdapter{d: discovery})
-	mapper := wmr.NewMapper()
-	mapper.BindTopology(wneTopologyAdapter{t: navigation})
+func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string, error, wmr.LayoutEditing), trace *log.Logger, capture func(wmr.RebuildCapture) error, store *liveMapStore) {
+	var state savedLiveMap
+	var loadErr error
+	if store != nil {
+		state, loadErr = store.load()
+	}
+	discovery, navigation, mapper, restoreErr := state.restore()
+	loadErr = errors.Join(loadErr, restoreErr)
+	if loadErr != nil {
+		loadErr = fmt.Errorf("could not restore saved map: %w", loadErr)
+		trace.Print(loadErr)
+		discovery, navigation, mapper, _ = (savedLiveMap{}).restore()
+		store = nil
+	}
 	mapper.SetIssueReporter(trace.Printf)
 	if capture != nil {
 		mapper.SetRebuildCapture(func(entry wmr.RebuildCapture) { _ = capture(entry) })
@@ -178,6 +194,15 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 	var pending *wmr.Correction
 	var pendingRoom wne.RoomID
 	var viewVersion uint64
+	saveProgress := func() error {
+		if store != nil {
+			if err := store.save(discovery, navigation, mapper); err != nil {
+				trace.Printf("Could not save map: %v", err)
+				return fmt.Errorf("could not save map: %w", err)
+			}
+		}
+		return nil
+	}
 	recordView := func(layout wmr.Layout, title string, arrival wne.RoomArrival, err error) {
 		if capture == nil {
 			return
@@ -201,7 +226,7 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 		}
 		_ = capture(entry)
 	}
-	trackEdit := func(edit *wmr.Correction, room wne.RoomID, onApplied func(wmr.Layout)) {
+	trackEdit := func(edit *wmr.Correction, room wne.RoomID, onApplied func(wmr.Layout, error)) {
 		pending, pendingRoom = edit, room
 		submit := edit.Submit
 		edit.Submit = func(rooms []wmr.Room) (wmr.Layout, error) {
@@ -213,7 +238,7 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 			applied, err := submit(rooms)
 			if err == nil {
 				pending = nil
-				onApplied(applied)
+				onApplied(applied, saveProgress())
 			}
 			return applied, err
 		}
@@ -239,13 +264,16 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 				current := mapper.SnapshotLayout(discovery, layout.Current)
 				edit := mapper.NewMapEdit(current, discovery, capture)
 				id := wne.RoomID(current.Current)
-				trackEdit(edit, id, func(applied wmr.Layout) {
-					recordView(applied, title, wne.RoomArrival{Room: id, From: id}, nil)
+				trackEdit(edit, id, func(applied wmr.Layout, saveErr error) {
+					recordView(applied, title, wne.RoomArrival{Room: id, From: id}, saveErr)
 				})
 				return edit
 			}
 		}
 		return editing
+	}
+	if layout := mapper.SnapshotLayout(discovery, ""); len(layout.Rooms) != 0 || loadErr != nil {
+		showMap(layout, "", loadErr, editingForView(layout, "", nil))
 	}
 
 	loadFallback := sync.OnceValue(func() error {
@@ -280,6 +308,7 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 			if err := loadFallback(); err != nil {
 				if roomID != "" {
 					navigation.ObserveRoom(roomID)
+					err = errors.Join(err, saveProgress())
 				}
 				pending = nil
 				queueView(mapper.SnapshotLayout(discovery, ""), err, nil)
@@ -313,16 +342,17 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 			err = fmt.Errorf("Room %s is missing from Rooms/", id)
 		}
 		layout := mapper.SnapshotLayout(discovery, id)
+		viewErr := errors.Join(err, saveProgress())
 		if arrival.From != arrival.Room || exitsChanged {
-			recordView(layout, room.Name, arrival, err)
+			recordView(layout, room.Name, arrival, viewErr)
 		}
 		correction := mapper.NewCorrection(layout, discovery, err, capture)
 		if correction != nil {
-			trackEdit(correction, roomID, func(applied wmr.Layout) {
-				recordView(applied, room.Name, arrival, nil)
+			trackEdit(correction, roomID, func(applied wmr.Layout, saveErr error) {
+				recordView(applied, room.Name, arrival, saveErr)
 			})
 		}
-		queueView(layout, err, correction)
+		queueView(layout, viewErr, correction)
 	}, func(name string) bool {
 		mapMu.Lock()
 		if err := loadFallback(); err != nil {
