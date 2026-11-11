@@ -163,10 +163,12 @@ func layoutLivePanels(hwnd uintptr) {
 	if liveWindow.beginMapEdit != nil || liveWindow.mapEditor.active != nil {
 		const footerHeight int32 = 28
 		mapHeight -= footerHeight
-		half := (mapWidth - 6) / 2
+		const buttonGap int32 = 6
+		buttonWidth := (mapWidth - 2*buttonGap) / 3
 		moveWindow(hMapEdit, mapLeft, margin+mapHeight+4, mapWidth, 24)
-		moveWindow(hMapSave, mapLeft, margin+mapHeight+4, half, 24)
-		moveWindow(hMapCancel, mapLeft+half+6, margin+mapHeight+4, half, 24)
+		moveWindow(hMapSave, mapLeft, margin+mapHeight+4, buttonWidth, 24)
+		moveWindow(hMapCancel, mapLeft+buttonWidth+buttonGap, margin+mapHeight+4, buttonWidth, 24)
+		moveWindow(hMapExit, mapLeft+2*(buttonWidth+buttonGap), margin+mapHeight+4, mapWidth-2*(buttonWidth+buttonGap), 24)
 	}
 	moveWindow(hWMP, mapLeft, margin, mapWidth, mapHeight)
 	moveWindow(hWICLbl, margin, labelTop, width, labelHeight)

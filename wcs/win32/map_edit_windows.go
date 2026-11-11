@@ -26,24 +26,27 @@ const (
 	mapEditID   = 1001
 	mapSaveID   = 1002
 	mapCancelID = 1003
+	mapExitID   = 1004
 
 	selectionDragThreshold = 4
+	mapEditHelp            = "Drag to box-select. Ctrl-drag adds a box and Ctrl-click toggles a room. Drag selected rooms to move them. Shift-drag moves a row or column."
 )
 
 var (
-	hMapEdit, hMapSave, hMapCancel uintptr
-	commonControls                 = syscall.NewLazyDLL("comctl32.dll")
-	procSetWindowSubclass          = commonControls.NewProc("SetWindowSubclass")
-	procDefSubclassProc            = commonControls.NewProc("DefSubclassProc")
-	procSetCapture                 = user32.NewProc("SetCapture")
-	procReleaseCapture             = user32.NewProc("ReleaseCapture")
-	procFrameRect                  = user32.NewProc("FrameRect")
+	hMapEdit, hMapSave, hMapCancel, hMapExit uintptr
+	commonControls                           = syscall.NewLazyDLL("comctl32.dll")
+	procSetWindowSubclass                    = commonControls.NewProc("SetWindowSubclass")
+	procDefSubclassProc                      = commonControls.NewProc("DefSubclassProc")
+	procSetCapture                           = user32.NewProc("SetCapture")
+	procReleaseCapture                       = user32.NewProc("ReleaseCapture")
+	procFrameRect                            = user32.NewProc("FrameRect")
 )
 
 type mapEditor struct {
 	active   *wmr.Correction
 	failure  bool
 	draft    liveMapView
+	baseline wmr.Layout
 	status   string
 	grid     mapGrid
 	selected map[wmr.RoomID]bool
@@ -99,8 +102,9 @@ func createCorrectionControls(parent, instance uintptr) {
 		return hwnd
 	}
 	hMapEdit = create("Edit map", mapEditID)
-	hMapSave = create("Save correction", mapSaveID)
-	hMapCancel = create("Skip correction", mapCancelID)
+	hMapSave = create("Save", mapSaveID)
+	hMapCancel = create("Cancel", mapCancelID)
+	hMapExit = create("Exit", mapExitID)
 	if ok, _, _ := procSetWindowSubclass.Call(hWMP, syscall.NewCallback(mapPanelProc), 1, 0); ok == 0 {
 		panic("Could not enable map dragging")
 	}
@@ -119,6 +123,7 @@ func (s *liveShell) updateCorrectionControls() {
 	show(hMapEdit, s.beginMapEdit != nil && e.active == nil)
 	show(hMapSave, e.active != nil)
 	show(hMapCancel, e.active != nil)
+	show(hMapExit, e.active != nil)
 	procInvalidateRect.Call(hWMP, 0, 0)
 }
 
@@ -126,21 +131,22 @@ func (s *liveShell) openMapEditor(correction *wmr.Correction, failure bool) {
 	e := &s.mapEditor
 	e.endDrag()
 	e.active, e.failure = correction, failure
-	e.draft = liveMapView{layout: correction.Draft, title: s.mapView.title}
-	e.draft.layout.Rooms = slices.Clone(correction.Draft.Rooms)
-	e.status = "Drag to box-select. Ctrl-drag adds a box and Ctrl-click toggles a room. Drag selected rooms to move them. Shift-drag moves a row or column."
-	if failure {
+	e.baseline = correction.Draft
+	e.draft = liveMapView{title: s.mapView.title}
+	e.resetDraft()
+	procEnableWindow.Call(hWIC, 0)
+	s.updateCorrectionControls()
+}
+
+func (e *mapEditor) resetDraft() {
+	e.draft.layout = e.baseline
+	e.draft.layout.Rooms = slices.Clone(e.baseline.Rooms)
+	e.status = mapEditHelp
+	if e.failure {
 		e.status += " The yellow room is the destination."
-		setWindowText(hMapSave, "Save correction")
-		setWindowText(hMapCancel, "Skip correction")
-	} else {
-		setWindowText(hMapSave, "Save map")
-		setWindowText(hMapCancel, "Cancel")
 	}
 	e.grid = mapGrid{}
 	e.selected = nil
-	procEnableWindow.Call(hWIC, 0)
-	s.updateCorrectionControls()
 }
 
 func (s *liveShell) editMapCommand(id uintptr) bool {
@@ -152,24 +158,35 @@ func (s *liveShell) editMapCommand(id uintptr) bool {
 				s.openMapEditor(edit, false)
 			}
 		}
-	case mapSaveID:
+	case mapSaveID, mapExitID:
 		if e.active != nil {
+			e.endDrag()
 			applied, err := e.active.Submit(e.draft.layout.Rooms)
-			if err != nil {
-				e.status = fmt.Sprintf("Edit needs changes. %v", err)
-			} else {
+			if len(applied.Rooms) != 0 {
 				s.mapView.layout = applied
 				if e.failure {
 					s.mapView.err = nil
 				}
+				e.failure = false
+				e.baseline = applied
+				e.draft.layout = applied
+				e.draft.layout.Rooms = slices.Clone(applied.Rooms)
+			}
+			switch {
+			case err != nil:
+				e.status = fmt.Sprintf("Save failed. %v", err)
+			case id == mapExitID:
 				s.closeMapEditor()
+			default:
+				e.status = "Map saved. " + mapEditHelp
 			}
 			procInvalidateRect.Call(hWMP, 0, 0)
 		}
 	case mapCancelID:
 		if e.active != nil {
-			e.active.Discard()
-			s.closeMapEditor()
+			e.endDrag()
+			e.resetDraft()
+			procInvalidateRect.Call(hWMP, 0, 0)
 		}
 	default:
 		return false
@@ -180,8 +197,10 @@ func (s *liveShell) editMapCommand(id uintptr) bool {
 func (s *liveShell) closeMapEditor() {
 	e := &s.mapEditor
 	e.endDrag()
-	e.active, e.draft, e.grid = nil, liveMapView{}, mapGrid{}
-	e.selected = nil
+	if e.active != nil {
+		e.active.Close()
+	}
+	*e = mapEditor{}
 	s.updateCorrectionControls()
 	if s.connected {
 		procEnableWindow.Call(hWIC, 1)

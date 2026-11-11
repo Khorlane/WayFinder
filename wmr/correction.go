@@ -18,9 +18,9 @@ func (f *rebuildFailure) Error() string { return f.err.Error() }
 
 // Correction is a detached proposal for editing the live layout.
 type Correction struct {
-	Draft   Layout
-	Submit  func([]Room) (Layout, error)
-	Discard func()
+	Draft  Layout
+	Submit func([]Room) (Layout, error)
+	Close  func()
 }
 
 // LayoutEditing exposes automatic recovery and manual editing for a map view.

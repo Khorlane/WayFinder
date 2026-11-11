@@ -237,12 +237,14 @@ func configureLiveMap(gateway *weg.LiveGateway, showMap func(wmr.Layout, string,
 			}
 			applied, err := submit(rooms)
 			if err == nil {
-				pending = nil
-				onApplied(applied, saveProgress())
+				// Later saves must honor any connections locked by this save.
+				submit = mapper.NewMapEdit(applied, discovery, capture).Submit
+				err = saveProgress()
+				onApplied(applied, err)
 			}
 			return applied, err
 		}
-		edit.Discard = func() {
+		edit.Close = func() {
 			mapMu.Lock()
 			defer mapMu.Unlock()
 			if pending == edit {
